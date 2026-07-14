@@ -1,5 +1,7 @@
 # Frame Sight
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 AI 驱动的视频分析与自动剪辑桌面应用。用自然语言描述需求，Agent 自主完成视频问答与自动剪辑。
 
 ## 功能特性
@@ -248,4 +250,4 @@ const myTool: AgentTool = {
 
 ## License
 
-Private
+[MIT](LICENSE) © 2026 逍遥成居士

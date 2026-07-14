@@ -2,7 +2,26 @@
   "name": "frame-sight",
   "private": true,
   "version": "0.1.0",
-  "description": "ViewPoint — AI-driven video analysis & auto-editing desktop app (Agent mode)",
+  "license": "MIT",
+  "description": "AI-driven video analysis & auto-editing desktop app — natural language powered Agent mode with video Q&A, auto-editing, and dynamic script tools.",
+  "author": "逍遥成居士 <liuchengxu1994@gmail.com>",
+  "homepage": "https://github.com/liuchengxu1994/frame-sight#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/liuchengxu1994/frame-sight.git"
+  },
+  "bugs": {
+    "url": "https://github.com/liuchengxu1994/frame-sight/issues"
+  },
+  "keywords": [
+    "video-editing",
+    "ai-agent",
+    "electron",
+    "llm",
+    "video-analysis",
+    "auto-editing",
+    "react"
+  ],
   "workspaces": [
     "apps/frontend",
     "apps/desktop"
