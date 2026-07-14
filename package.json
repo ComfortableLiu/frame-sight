@@ -1,0 +1,23 @@
+{
+  "name": "frame-sight",
+  "private": true,
+  "version": "0.1.0",
+  "description": "ViewPoint — AI-driven video analysis & auto-editing desktop app (Agent mode)",
+  "workspaces": [
+    "apps/frontend",
+    "apps/desktop"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n frontend,desktop \"yarn:dev:frontend\" \"yarn:dev:desktop\"",
+    "dev:frontend": "yarn workspace @frame-sight/frontend dev",
+    "dev:desktop": "yarn workspace @frame-sight/desktop dev",
+    "build": "yarn workspace @frame-sight/frontend build && yarn workspace @frame-sight/desktop build",
+    "typecheck": "yarn workspace @frame-sight/frontend typecheck && yarn workspace @frame-sight/desktop typecheck",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
+  }
+}
