@@ -3,6 +3,7 @@ dist/
 frontend-dist/
 openspec/
 .claude
+.agents
 
 # Yarn 4
 .yarn

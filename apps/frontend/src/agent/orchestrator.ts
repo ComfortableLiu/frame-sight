@@ -111,7 +111,7 @@ export async function runAgent(input: AgentRunInput): Promise<AgentRunOutput> {
       endpoint: input.endpoint,
       signal: input.signal,
       maxTokens: 8000,
-      runId: input.tools.find((t) => t.category === 'dynamic')?.name,
+      runId: input.runId,
     });
 
     // 任务摘要

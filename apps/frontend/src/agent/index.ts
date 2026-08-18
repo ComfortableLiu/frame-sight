@@ -30,4 +30,4 @@ export {
   stripAgentResultFence,
   extractMediaFromToolResults,
 } from './result/builder.js';
-export { createAllTools } from './tools/registry.js';
+export { ToolRegistry, createToolRegistry, createAllTools } from './tools/registry.js';

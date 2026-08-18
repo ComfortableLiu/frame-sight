@@ -105,10 +105,18 @@ export interface ViewPointApi {
   clearAgentOutputs: () => Promise<{ success: boolean }>;
 
   // ── 对象存储 ──
-  uploadToObjectStorage: (filePath: string) => Promise<{ objectUrl: string }>;
+  uploadToObjectStorage: (filePath: string) => Promise<{ objectUrl: string; error?: string }>;
   getStorageConfig: () => Promise<StorageConfigSnapshot>;
   saveStorageConfig: (config: StorageConfig) => Promise<{ success: boolean; error?: string }>;
   testStorageConnection: (config: StorageConfig) => Promise<{ success: boolean; message: string; modelCount?: number }>;
+
+  // ── 报告缓存 / 临时文件 ──
+  getReportCache: (payload: { filePath: string; size: number }) => Promise<{ hit: boolean; srt?: string; report?: string; createdAt?: number }>;
+  saveReportCache: (payload: { filePath: string; size: number; srt: string; report: string }) => Promise<{ success: boolean; error?: string }>;
+  getSrtCache: (payload: { filePath: string; size: number }) => Promise<{ hit: boolean; srt?: string }>;
+  saveSrtCache: (payload: { filePath: string; size: number; srt: string }) => Promise<{ success: boolean; error?: string }>;
+  clearReportCache: (payload: { filePath: string; size: number }) => Promise<{ success: boolean; error?: string }>;
+  deleteFile: (payload: { filePath: string }) => Promise<{ success: boolean; error?: string }>;
 
   // ── 通用 ──
   getConfig: () => Promise<Record<string, ModelEnginesLegacyEntry>>;
@@ -120,8 +128,14 @@ export interface ViewPointApi {
   probeVideoQuality: (filePath: string) => Promise<VideoInfo>;
   statFile: (filePath: string) => Promise<{ size: number | null; exists: boolean }>;
   extractAudioFromVideo: (inputPath: string) => Promise<{ success: boolean; outputPath?: string; error?: string }>;
+  readFileAsBase64: (filePath: string) => Promise<{ success: boolean; base64?: string; size?: number; error?: string }>;
+  writeBase64File: (payload: { filePath: string; base64: string }) => Promise<{ success: boolean; outputPath?: string; size?: number; error?: string }>;
   getModelConfig: () => Promise<ModelConfig>;
   saveModelConfig: (config: ModelConfig) => Promise<{ success: boolean; error?: string }>;
+
+  // ── 语音合成 / 语音识别 ──
+  getVoiceConfig: () => Promise<VoiceConfigSnapshot>;
+  saveVoiceConfig: (config: VoiceConfigSnapshot) => Promise<{ success: boolean; error?: string }>;
 
   // ── 动态脚本工具 ──
   agentScriptToolValidate: (manifest: AgentScriptToolManifest) => Promise<AgentScriptToolValidationResult>;
@@ -131,7 +145,7 @@ export interface ViewPointApi {
 }
 
 // 引入用于类型声明
-import type { ModelConfig, StorageConfig, StorageConfigSnapshot, ModelEnginesLegacyEntry } from './modelConfig';
+import type { ModelConfig, StorageConfig, StorageConfigSnapshot, ModelEnginesLegacyEntry, VoiceConfigSnapshot } from './modelConfig';
 
 declare global {
   interface Window {

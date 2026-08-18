@@ -19,6 +19,14 @@ const api = {
   saveStorageConfig: (config: unknown) => ipcRenderer.invoke('vp:saveStorageConfig', config),
   testStorageConnection: (config: unknown) => ipcRenderer.invoke('vp:testStorageConnection', config),
 
+  // ── 报告缓存 / 临时文件 ──
+  getReportCache: (payload: unknown) => ipcRenderer.invoke('vp:getReportCache', payload),
+  saveReportCache: (payload: unknown) => ipcRenderer.invoke('vp:saveReportCache', payload),
+  getSrtCache: (payload: unknown) => ipcRenderer.invoke('vp:getSrtCache', payload),
+  saveSrtCache: (payload: unknown) => ipcRenderer.invoke('vp:saveSrtCache', payload),
+  clearReportCache: (payload: unknown) => ipcRenderer.invoke('vp:clearReportCache', payload),
+  deleteFile: (payload: unknown) => ipcRenderer.invoke('vp:deleteFile', payload),
+
   // ── 通用 ──
   getConfig: () => ipcRenderer.invoke('vp:getConfig'),
   pickVideoFile: () => ipcRenderer.invoke('vp:pickVideoFile'),
@@ -29,8 +37,14 @@ const api = {
   probeVideoQuality: (filePath: string) => ipcRenderer.invoke('vp:probeVideoQuality', filePath),
   statFile: (filePath: string) => ipcRenderer.invoke('vp:statFile', filePath),
   extractAudioFromVideo: (inputPath: string) => ipcRenderer.invoke('vp:extractAudioFromVideo', inputPath),
+  readFileAsBase64: (filePath: string) => ipcRenderer.invoke('vp:readFileAsBase64', filePath),
+  writeBase64File: (payload: unknown) => ipcRenderer.invoke('vp:writeBase64File', payload),
   getModelConfig: () => ipcRenderer.invoke('vp:getModelConfig'),
   saveModelConfig: (config: unknown) => ipcRenderer.invoke('vp:saveModelConfig', config),
+
+  // ── 语音合成 / 语音识别 ──
+  getVoiceConfig: () => ipcRenderer.invoke('vp:getVoiceConfig'),
+  saveVoiceConfig: (config: unknown) => ipcRenderer.invoke('vp:saveVoiceConfig', config),
 
   // ── 动态脚本工具 ──
   agentScriptToolValidate: (manifest: unknown) => ipcRenderer.invoke('vp:agentScriptTool:validate', manifest),

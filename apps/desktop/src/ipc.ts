@@ -4,6 +4,8 @@ import * as fs from 'node:fs';
 import { VideoService } from './video.service.js';
 import { ModelConfigService } from './model-config.service.js';
 import { StorageService } from './storage.service.js';
+import { VoiceConfigService } from './voice-config.service.js';
+import { ReportCacheService } from './report-cache.service.js';
 import type { AgentScriptToolService } from './agent-script-tool.service.js';
 
 export interface IpcDeps {
@@ -16,6 +18,8 @@ export function registerAllIpcHandlers(deps: IpcDeps): void {
   const videoService = new VideoService();
   const modelConfigService = new ModelConfigService();
   const storageService = new StorageService();
+  const voiceConfigService = new VoiceConfigService();
+  const reportCacheService = new ReportCacheService();
 
   const agentOutputsRoot = path.join(mediaRoot, 'agent-outputs');
   fs.mkdirSync(agentOutputsRoot, { recursive: true });
@@ -110,6 +114,47 @@ export function registerAllIpcHandlers(deps: IpcDeps): void {
   });
   ipcMain.handle('vp:testStorageConnection', (_e, config) => storageService.testConnection(config));
 
+  // ── 报告缓存 / 临时文件 ──
+
+  ipcMain.handle('vp:getReportCache', (_e, payload: { filePath: string; size: number }) =>
+    reportCacheService.get(payload.filePath, payload.size),
+  );
+  ipcMain.handle('vp:saveReportCache', (_e, payload: { filePath: string; size: number; srt: string; report: string }) => {
+    try {
+      reportCacheService.save(payload.filePath, payload.size, payload.srt, payload.report);
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+  ipcMain.handle('vp:getSrtCache', (_e, payload: { filePath: string; size: number }) =>
+    reportCacheService.getSrt(payload.filePath, payload.size),
+  );
+  ipcMain.handle('vp:saveSrtCache', (_e, payload: { filePath: string; size: number; srt: string }) => {
+    try {
+      reportCacheService.saveSrt(payload.filePath, payload.size, payload.srt);
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+  ipcMain.handle('vp:clearReportCache', (_e, payload: { filePath: string; size: number }) => {
+    try {
+      reportCacheService.remove(payload.filePath, payload.size);
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+  ipcMain.handle('vp:deleteFile', (_e, payload: { filePath: string }) => {
+    try {
+      if (payload?.filePath && fs.existsSync(payload.filePath)) fs.unlinkSync(payload.filePath);
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
   // ── 通用 ──
 
   ipcMain.handle('vp:getConfig', () => modelConfigService.getLegacyModelEnginesConfig());
@@ -144,10 +189,46 @@ export function registerAllIpcHandlers(deps: IpcDeps): void {
     videoService.extractAudioFromVideo(inputPath),
   );
 
+  ipcMain.handle('vp:readFileAsBase64', (_e, filePath: string) => {
+    try {
+      const buf = fs.readFileSync(filePath);
+      return { success: true, base64: buf.toString('base64'), size: buf.length };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  ipcMain.handle('vp:writeBase64File', (_e, payload: { filePath: string; base64: string }) => {
+    try {
+      const absPath = path.resolve(payload.filePath);
+      // 安全检查：必须写入 agent-outputs 下
+      if (!absPath.startsWith(agentOutputsRoot + path.sep)) {
+        return { success: false, error: '路径越权：不在 agent-outputs 下' };
+      }
+      fs.mkdirSync(path.dirname(absPath), { recursive: true });
+      fs.writeFileSync(absPath, Buffer.from(payload.base64, 'base64'));
+      return { success: true, outputPath: absPath, size: Buffer.byteLength(payload.base64, 'base64') };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
   ipcMain.handle('vp:getModelConfig', () => modelConfigService.getConfig());
   ipcMain.handle('vp:saveModelConfig', (_e, config) => {
     modelConfigService.saveConfig(config);
     return { success: true };
+  });
+
+  // ── 语音合成 / 语音识别 ──
+
+  ipcMain.handle('vp:getVoiceConfig', () => voiceConfigService.getConfig());
+  ipcMain.handle('vp:saveVoiceConfig', (_e, config) => {
+    try {
+      voiceConfigService.saveConfig(config);
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
   });
 
   // ── 动态脚本工具 ──

@@ -63,7 +63,8 @@ ${taskState ? 'taskAction 含义：continuation=延续当前任务，correction=
   };
 
   try {
-    const raw = await caller([sys, user], { signal, maxTokens: 400 });
+    // 不传 maxTokens：思考型模型的推理会占用大量 token，小限额会导致正文被截断、JSON 解析失败
+    const raw = await caller([sys, user], { signal });
     const json = extractJson(raw);
     if (!json) return fallbackDefault(userInput);
     const intent: AgentIntent = json.intent === 'tool' ? 'tool' : 'qa';

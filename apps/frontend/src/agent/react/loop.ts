@@ -21,6 +21,8 @@ import {
 } from './promptBuilder.js';
 import { parseAgentResponse, parseFirstTurnResponse } from './responseParser.js';
 import { compressMessagesIfNeeded, deriveContextLimit } from '../llm/contextManager.js';
+import { parseToolReturn } from '../result/builder.js';
+import type { ToolRegistry } from '../tools/registry.js';
 
 const ABSOLUTE_MAX_ITERATIONS = 50;
 
@@ -29,7 +31,8 @@ export interface ReActLoopInput {
   videoContext: VideoContext;
   conversationContext: ConversationContext;
   llmCaller: LlmCaller;
-  tools: AgentTool[];
+  /** 统一工具注册表（含运行时动态注册的工具） */
+  tools: ToolRegistry;
   taskState?: AgentTaskState;
   config?: AgentRunConfig;
   callbacks?: AgentRunCallbacks;
@@ -51,10 +54,8 @@ export async function runReActLoop(input: ReActLoopInput): Promise<ReActLoopOutp
     maxTokens = 8000,
   } = input;
 
-  // 当前工具表（动态工具会追加）
-  let currentTools = [...input.tools];
-  const toolMap = new Map<string, AgentTool>();
-  for (const t of currentTools) toolMap.set(t.name, t);
+  // 统一工具注册表（动态工具运行时注册）
+  const registry = input.tools;
 
   let todos: TodoItem[] = [];
   const steps: ReActStep[] = [];
@@ -64,15 +65,30 @@ export async function runReActLoop(input: ReActLoopInput): Promise<ReActLoopOutp
   let usageBaselineMessageCount = 0;
   const limit = deriveContextLimit(input.endpoint, input.config?.maxContextTokens, maxTokens);
 
-  const systemPrompt = buildReActSystemPrompt(videoContext, currentTools, input.taskState);
   const messages: LlmMessage[] = [
-    { role: 'system', content: systemPrompt },
+    { role: 'system', content: buildReActSystemPrompt(videoContext, registry.list(), input.taskState) },
     ...conversationMessagesToLlm(conversationContext),
   ];
 
   let stepIndex = 0;
   let truncated = false;
   let finalAnswer = '';
+  const maxToolSteps = input.config?.maxToolSteps ?? 12;
+  /** 模型未按协议输出（无 tool_call 且未完成）时的格式重试次数 */
+  let formatRetries = 0;
+  const MAX_FORMAT_RETRIES = 2;
+  /** 格式重试时替代标准轮次提示的自定义提示 */
+  let customReprompt: string | null = null;
+
+  // 工具集变化（如动态工具注册）时刷新系统提示中的工具表
+  registry.onChange(() => {
+    if (messages[0]?.role === 'system') {
+      messages[0] = {
+        role: 'system',
+        content: buildReActSystemPrompt(videoContext, registry.list(), input.taskState),
+      };
+    }
+  });
 
   while (stepIndex < ABSOLUTE_MAX_ITERATIONS) {
     // 终止：全部 done
@@ -81,14 +97,24 @@ export async function runReActLoop(input: ReActLoopInput): Promise<ReActLoopOutp
       break;
     }
 
+    // 终止：达到工具步数上限
+    if (steps.length >= maxToolSteps) {
+      finalAnswer = await generateFinalAnswer(llmCaller, messages, signal, maxTokens, callbacks);
+      truncated = true;
+      break;
+    }
+
     const isFirstTurn = stepIndex === 0;
-    const userPrompt = isFirstTurn
-      ? buildFirstTurnPrompt(userInput)
-      : buildSubsequentTurnPrompt(
-          todos,
-          selectFocusTodo(todos),
-          steps.length ? steps[steps.length - 1].result.error : undefined,
-        );
+    const userPrompt =
+      customReprompt ??
+      (isFirstTurn
+        ? buildFirstTurnPrompt(userInput)
+        : buildSubsequentTurnPrompt(
+            todos,
+            selectFocusTodo(todos),
+            steps.length ? steps[steps.length - 1].result.error : undefined,
+          ));
+    customReprompt = null;
     messages.push({ role: 'user', content: userPrompt });
 
     callbacks?.onStageChange?.({
@@ -144,12 +170,25 @@ export async function runReActLoop(input: ReActLoopInput): Promise<ReActLoopOutp
         finalAnswer = raw;
         break;
       }
-      // 既无工具调用又未全完成 → 尝试生成最终回答
+      // 任务未完成但模型未按协议输出（无 tool_call）→ 提醒格式后重试，避免直接放弃
+      if (formatRetries < MAX_FORMAT_RETRIES) {
+        formatRetries += 1;
+        customReprompt = todos.length
+          ? '请输出 ```tool_call 代码块（JSON: {name, arguments}）推进当前 TODO；若全部完成则输出最终 Markdown 总结。不要输出其他内容。'
+          : '你的回复未按要求的格式输出。请先输出 ```todos 代码块（JSON 数组，每项 {id, description, toolHint?}），再输出 ```tool_call 代码块（JSON: {name, arguments}）。请重新输出，不要输出其他内容。';
+        continue;
+      }
+      // 重试仍无工具调用 → 生成最终回答
       finalAnswer = await generateFinalAnswer(llmCaller, messages, signal, maxTokens, callbacks);
+      // 模型以总结收尾：剩余 TODO 标记完成并同步 UI
+      if (todos.some((t) => t.status !== 'done')) {
+        todos = todos.map((t) => (t.status === 'done' ? t : { ...t, status: 'done' as const }));
+        callbacks?.onTodoUpdate?.(todos, todos.map((t) => t.id));
+      }
       break;
     }
 
-    const tool = toolMap.get(parsed.toolCall.name);
+    const tool = registry.get(parsed.toolCall.name);
     const stepResult = await executeTool(
       parsed.toolCall.name,
       parsed.toolCall.arguments,
@@ -165,18 +204,19 @@ export async function runReActLoop(input: ReActLoopInput): Promise<ReActLoopOutp
       args: parsed.toolCall.arguments,
       result: stepResult,
     });
+    // 通知 UI：将执行过程追加到聊天列表
+    callbacks?.onReActStep?.(steps[steps.length - 1]);
 
-    // 动态工具注册
-    if (parsed.toolCall.name === 'create_dynamic_script_tool' && stepResult.success) {
-      const dynamicTool = extractDynamicTool(stepResult, currentTools, input);
-      if (dynamicTool && !toolMap.has(dynamicTool.name)) {
-        currentTools.push(dynamicTool);
-        toolMap.set(dynamicTool.name, dynamicTool);
-      }
+    // 动态工具注册：结果中含工具描述时由注册表统一接管
+    if (stepResult.success) {
+      registry.registerDynamicFromResult(stepResult, input.runId ?? '');
     }
 
     // 更新 focus TODO 状态与失败计数
+    const focusBefore = todos.find((t) => t.status === 'in_progress')?.id;
     todos = updateFocusAfterToolCall(todos, parsed.toolCall.name, stepResult);
+    // updateFocusAfterToolCall 不发通知，这里同步 UI（否则最后一项完成后仍显示进行中）
+    if (focusBefore) callbacks?.onTodoUpdate?.(todos, [focusBefore]);
 
     messages.push(buildToolResultMessage(parsed.toolCall.name, stepResult));
 
@@ -226,6 +266,17 @@ async function executeTool(
   });
   try {
     const output = await tool.handler(args, signal);
+    // 结构化报告协议：工具返回 { ok: false }（或旧字段 success: false）视为执行失败
+    const parsed = parseToolReturn(output);
+    if (parsed && (parsed.ok === false || parsed.success === false)) {
+      return {
+        toolName: name,
+        success: false,
+        output,
+        error: typeof parsed.error === 'string' ? parsed.error : '工具返回失败',
+        durationMs: Date.now() - start,
+      };
+    }
     return {
       toolName: name,
       success: true,
@@ -360,32 +411,3 @@ async function generateFinalAnswer(
   return answer;
 }
 
-function extractDynamicTool(
-  result: ToolCallResult,
-  _currentTools: AgentTool[],
-  input: ReActLoopInput,
-): AgentTool | null {
-  try {
-    const json = JSON.parse(result.output);
-    const tool = json?.tool ?? json;
-    if (!tool?.name || typeof tool.name !== 'string') return null;
-    return {
-      name: tool.name,
-      displayName: tool.displayName ?? tool.name,
-      category: 'dynamic',
-      description: tool.description ?? '动态脚本工具',
-      parameters: tool.parameters ?? { type: 'object', properties: {} },
-      handler: async (args, _signal) => {
-        const res = await window.viewPoint.agentScriptToolExecute({
-          name: tool.name,
-          args,
-          runId: input.runId ?? '',
-        });
-        if (!res.success) throw new Error(res.error ?? '动态工具执行失败');
-        return res.output;
-      },
-    };
-  } catch {
-    return null;
-  }
-}

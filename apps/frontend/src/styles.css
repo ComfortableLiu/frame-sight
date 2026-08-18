@@ -295,6 +295,19 @@ button {
   border-radius: 20px;
   background: var(--bg-raised);
 }
+.topbar-status-btn {
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: filter var(--transition);
+}
+.topbar-status-btn:hover:not(:disabled) {
+  filter: brightness(1.15);
+}
+.topbar-status-btn:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
 .topbar-status.ready {
   color: var(--success);
   background: rgba(52, 211, 153, 0.1);
@@ -302,6 +315,11 @@ button {
 .topbar-status.generating {
   color: var(--warning);
   background: rgba(251, 191, 36, 0.1);
+}
+.topbar-status.error {
+  color: var(--error);
+  background: rgba(248, 113, 113, 0.15);
+  font-weight: 600;
 }
 
 .topbar-actions {
@@ -400,6 +418,13 @@ button {
   border-radius: var(--radius-md);
   color: var(--text-secondary);
   max-width: 85%;
+}
+
+.msg-status {
+  align-self: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 2px 0;
 }
 .msg-step code {
   font-size: 12px;
@@ -1106,6 +1131,18 @@ button {
   margin-bottom: 8px;
 }
 
+.voice-range-row {
+  margin-bottom: 8px;
+}
+
+.voice-range-row .form-label {
+  margin-bottom: 2px;
+}
+
+.voice-range-row input[type='range'] {
+  width: 100%;
+}
+
 .platform-card {
   background: var(--bg-input);
   border: 1px solid var(--border);
@@ -1275,4 +1312,302 @@ select.form-field {
 .tool-badge.error {
   color: var(--error);
   background: rgba(248, 113, 113, 0.12);
+}
+
+/* ── 视频内容分析弹窗 ─────────────────────────────────── */
+.analysis-modal {
+  width: 480px;
+}
+
+.analysis-steps {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.analysis-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.analysis-step.active {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.analysis-step.done {
+  color: var(--success);
+}
+
+.analysis-step.error {
+  color: var(--error);
+}
+
+.analysis-step-icon {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+.analysis-step-icon .spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--stage-bg);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.analysis-step-count {
+  margin-left: 8px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.analysis-progress {
+  height: 6px;
+  background: var(--bg-raised);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.analysis-progress-bar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 300ms ease;
+}
+
+.analysis-estimate {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.analysis-done {
+  font-size: 13px;
+  color: var(--success);
+}
+
+.analysis-error-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 16px;
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid var(--error);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+.analysis-error-icon {
+  font-size: 28px;
+  line-height: 1;
+  color: var(--error);
+}
+
+.analysis-error-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--error);
+}
+
+.analysis-error-detail {
+  font-size: 13px;
+  color: var(--text-primary);
+  max-height: 140px;
+  overflow-y: auto;
+  word-break: break-all;
+  user-select: text;
+  text-align: left;
+}
+
+/* 内容分析弹窗：子流程分组与步骤内进度条 */
+.analysis-step-group {
+  margin-bottom: 14px;
+}
+
+.analysis-step-group:last-of-type {
+  margin-bottom: 12px;
+}
+
+.analysis-step-group-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.analysis-step-group .analysis-steps {
+  margin-bottom: 0;
+}
+
+.analysis-step-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.analysis-step-detail {
+  margin-left: 8px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+.analysis-step-progress {
+  height: 4px;
+  background: var(--bg-raised);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.analysis-step-progress-bar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 300ms ease;
+}
+
+/* ── 分析产物查看弹窗 ─────────────────────────────────── */
+.report-viewer {
+  width: 720px;
+}
+
+.report-viewer-content {
+  margin: 0;
+  padding: 12px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 55vh;
+  overflow-y: auto;
+  user-select: text;
+}
+
+/* ── 会话重命名输入框 ─────────────────────────────────── */
+.session-rename-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  padding: 2px 6px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  outline: none;
+}
+
+/* ── 结构化工具结果渲染 ───────────────────────────────── */
+.msg-step-result {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tool-content-json {
+  margin: 0;
+  padding: 8px 10px;
+  background: var(--code-bg);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  user-select: text;
+}
+
+.tool-content-table-wrap {
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.tool-content-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.tool-content-table th,
+.tool-content-table td {
+  padding: 4px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.tool-content-table td:last-child {
+  white-space: normal;
+}
+
+.tool-content-table th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-raised);
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.tool-content-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  line-height: 1.8;
+}
+
+.tool-content-list mark {
+  background: rgba(251, 191, 36, 0.35);
+  border-radius: 2px;
+  padding: 0 2px;
+}
+
+.mermaid-block {
+  padding: 10px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: auto;
+  max-height: 320px;
+}
+
+.mermaid-block svg {
+  max-width: 100%;
+}
+
+/* ── 结果按钮列表 / 媒体预览 ──────────────────────────── */
+.result-btn-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.result-btn {
+  font-size: 12px;
+}
+
+.media-preview-modal {
+  width: 760px;
 }

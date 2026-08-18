@@ -101,6 +101,8 @@ export interface MediaItem {
   url: string;
   type: 'video' | 'audio' | 'image' | 'gif';
   fromTool?: string;
+  /** 缩略图 URL（可选） */
+  thumbnailUrl?: string;
 }
 
 export interface ResultButton {
@@ -109,6 +111,7 @@ export interface ResultButton {
   action: 'preview' | 'download' | 'open';
   mediaIndex?: number;
   url?: string;
+  /** 自定义打开目标（仅 open 动作，如 'view-report' / 'view-srt'） */
   openTarget?: string;
 }
 
@@ -119,6 +122,42 @@ export interface ResultPayload {
   mediaList?: MediaItem[];
   buttonList?: ResultButton[];
 }
+
+// ── 工具返回协议（结构化报告格式规范） ──
+
+/** 工具处理器返回的 JSON 字符串解析后的结构。 */
+export interface ToolReturnPayload {
+  ok: boolean;
+  title?: string;
+  description?: string;
+  /** 结构化内容体 */
+  content?: ToolStructuredContent;
+  /** 状态消息 */
+  message?: string;
+  /** 仅失败时的错误原因 */
+  error?: string;
+  /** 媒体文件 URL */
+  wosUrl?: string;
+  /** 备选媒体 URL */
+  finalUrl?: string;
+  /** SRT 字幕文本（仅 transcribe_audio） */
+  srt?: string;
+  /** 兼容旧字段 */
+  success?: boolean;
+  objectUrl?: string;
+  outputPath?: string;
+  [key: string]: unknown;
+}
+
+/** 结构化内容体：按 format 选择 UI 渲染方式。 */
+export type ToolStructuredContent =
+  | { format: 'mermaid'; code: string }
+  | { format: 'json_subtitles'; entries: Array<{ i: number; p: string; t: string; y: string; q?: string; w?: string; s?: string }> }
+  | { format: 'scenes'; scenes: Array<{ index: number; startMs: number; endMs: number; durationMs: number }>; totalScenes?: number; totalDurationMs?: number }
+  | { format: 'silence'; silences: Array<{ startMs: number; endMs: number; durationMs: number }>; totalSilenceMs?: number }
+  | { format: 'search_results'; keyword: string; matchCount: number; results: Array<{ matchIndex: number; start: string; end: string; before: string; match: string; after: string }> }
+  | { format: 'markdown'; text: string }
+  | { format: 'json'; data: unknown };
 
 // ───────────────────────── 任务状态机 ─────────────────────────
 
@@ -142,9 +181,20 @@ export interface AgentTaskState {
 
 // ───────────────────────── LLM 调用 ─────────────────────────
 
-export interface LlmMessage {
+/** 多模态消息内容块：文本或视频（对应 chat/completions 的 content 数组形式）。 */
+export type LlmContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'input_video'; input_video: { data: string } }
+  | { type: 'video_url'; video_url: { url: string }; fps?: number; media_resolution?: string };
+
+/**
+ * LLM 消息。裸写 LlmMessage 时 content 为纯文本字符串（现有用法不受影响）；
+ * 需要多模态（视频+文本）时使用 LlmMessage<string | LlmContentPart[]>，
+ * content 数组会原样 POST 给 chat/completions（caller.ts 不做加工）。
+ */
+export interface LlmMessage<C extends string | LlmContentPart[] = string> {
   role: 'system' | 'user' | 'assistant';
-  content: string;
+  content: C;
 }
 
 export interface LlmUsage {
@@ -238,8 +288,6 @@ export interface AgentRunCallbacks {
   onStageChange?: (stage: AgentStage) => void;
   onReActStep?: (step: ReActStep) => void;
   onLlmDelta?: (accumulated: string) => void;
-  /** 已废弃 */
-  onPlanReady?: (plan: string[]) => void;
   onTodosReady?: (todos: TodoItem[]) => void;
   onTodoUpdate?: (todos: TodoItem[], changedIds: string[]) => void;
 }
@@ -262,12 +310,15 @@ export interface AgentRunInput {
   videoContext: VideoContext;
   conversationContext: ConversationContext;
   llmCaller: LlmCaller;
-  tools: AgentTool[];
+  /** 统一工具注册表（含运行时动态注册的工具） */
+  tools: import('./tools/registry.js').ToolRegistry;
   endpoint?: LlmEndpoint;
   signal?: AbortSignal;
   config?: AgentRunConfig;
   callbacks?: AgentRunCallbacks;
   taskState?: AgentTaskState;
+  /** 动态脚本工具按 run 隔离 */
+  runId?: string;
 }
 
 export interface AgentRunOutput {

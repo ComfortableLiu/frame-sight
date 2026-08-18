@@ -1,44 +1,12 @@
 import type { AgentTool, ToolRuntimeDeps } from '../types.js';
+import { extractSilenceSegments, num, parseSrtCues, type SrtCue } from './shared.js';
 import * as path from '../pathShim.js';
 
 const BUFFER_MS = 300;
 const ORIGINAL_CLIP_VOLUME = 1;
 
-function num(args: Record<string, unknown>, key: string, fallback: number): number {
-  const v = args[key];
-  return typeof v === 'number' && Number.isFinite(v) ? v : fallback;
-}
 
-interface SrtCue {
-  startMs: number;
-  endMs: number;
-}
 
-function parseSrtCues(srt: string | undefined): SrtCue[] {
-  if (!srt) return [];
-  const cues: SrtCue[] = [];
-  const blocks = srt.split(/\n\s*\n/);
-  for (const block of blocks) {
-    const timeLine = block.split('\n').find((l) => l.includes('-->'));
-    if (!timeLine) continue;
-    const [ts, te] = timeLine.split('-->');
-    const startMs = srtTimeToMs(ts);
-    const endMs = srtTimeToMs(te);
-    if (startMs != null && endMs != null) cues.push({ startMs, endMs });
-  }
-  return cues;
-}
-
-function srtTimeToMs(s: string): number | null {
-  const m = s.trim().match(/(\d+):(\d+):(\d+)[,.](\d+)/);
-  if (!m) return null;
-  return (
-    parseInt(m[1]) * 3600000 +
-    parseInt(m[2]) * 60000 +
-    parseInt(m[3]) * 1000 +
-    parseInt(m[4].padEnd(3, '0').slice(0, 3))
-  );
-}
 
 /** 校验并规范时间区间，确保 0 <= start < end */
 function normalizeTimeRange(startMs: number, endMs: number, durationMs?: number): { startMs: number; endMs: number } {
@@ -153,11 +121,11 @@ export function createEditingTools(deps: ToolRuntimeDeps): AgentTool[] {
     },
     handler: async (args) => {
       const segments = Array.isArray(args.segments) ? (args.segments as Array<{ startMs: number; endMs: number }>) : [];
-      if (!segments.length) return JSON.stringify({ success: false, error: 'segments 为空' });
+      if (!segments.length) return JSON.stringify({ ok: false, error: 'segments 为空' });
       // 校验每个 segment
       for (const s of segments) {
         if (typeof s.startMs !== 'number' || typeof s.endMs !== 'number') {
-          return JSON.stringify({ success: false, error: 'segment 缺少 startMs/endMs' });
+          return JSON.stringify({ ok: false, error: 'segment 缺少 startMs/endMs' });
         }
       }
       const srtCues = cues();
@@ -176,7 +144,7 @@ export function createEditingTools(deps: ToolRuntimeDeps): AgentTool[] {
           originalClipVolume: ORIGINAL_CLIP_VOLUME,
         });
         if (!res.success || !res.outputPath) {
-          return JSON.stringify({ success: false, error: res.error ?? '裁剪失败' });
+          return JSON.stringify({ ok: false, error: res.error ?? '裁剪失败' });
         }
         clipPaths.push(res.outputPath);
       }
@@ -185,10 +153,10 @@ export function createEditingTools(deps: ToolRuntimeDeps): AgentTool[] {
         outputPath,
       });
       if (!composeRes.success || !composeRes.outputPath) {
-        return JSON.stringify({ success: false, error: composeRes.error ?? '拼接失败' });
+        return JSON.stringify({ ok: false, error: composeRes.error ?? '拼接失败' });
       }
       const uploaded = await uploadResult(composeRes.outputPath, deps);
-      return JSON.stringify({ success: true, objectUrl: uploaded.objectUrl, outputPath: composeRes.outputPath, uploadError: uploaded.uploadError });
+      return JSON.stringify({ ok: true, message: '裁剪拼接完成', wosUrl: uploaded.objectUrl, outputPath: composeRes.outputPath, uploadError: uploaded.uploadError });
     },
   };
 
@@ -227,7 +195,7 @@ export function createEditingTools(deps: ToolRuntimeDeps): AgentTool[] {
         keepSegments.push({ startMs: cursor, endMs: durationSec * 1000 });
       }
       if (!keepSegments.length) {
-        return JSON.stringify({ success: false, error: '未检测到可保留片段' });
+        return JSON.stringify({ ok: false, error: '未检测到可保留片段' });
       }
       const aligned = keepSegments.map((s) => alignToSrtBoundaries(s.startMs, s.endMs, srtCues, durationSec * 1000));
       const outputPath = path.join(deps.outputBaseDir, `no_silence_${Date.now()}.mp4`);
@@ -243,7 +211,7 @@ export function createEditingTools(deps: ToolRuntimeDeps): AgentTool[] {
           originalClipVolume: ORIGINAL_CLIP_VOLUME,
         });
         if (!res.success || !res.outputPath) {
-          return JSON.stringify({ success: false, error: res.error ?? '裁剪失败' });
+          return JSON.stringify({ ok: false, error: res.error ?? '裁剪失败' });
         }
         clipPaths.push(res.outputPath);
       }
@@ -252,10 +220,10 @@ export function createEditingTools(deps: ToolRuntimeDeps): AgentTool[] {
         outputPath,
       });
       if (!composeRes.success || !composeRes.outputPath) {
-        return JSON.stringify({ success: false, error: composeRes.error ?? '拼接失败' });
+        return JSON.stringify({ ok: false, error: composeRes.error ?? '拼接失败' });
       }
       const uploaded = await uploadResult(composeRes.outputPath, deps);
-      return JSON.stringify({ success: true, objectUrl: uploaded.objectUrl, outputPath: composeRes.outputPath, removedSilenceCount: silences.length, uploadError: uploaded.uploadError });
+      return JSON.stringify({ ok: true, message: '去静音完成', wosUrl: uploaded.objectUrl, outputPath: composeRes.outputPath, removedSilenceCount: silences.length, uploadError: uploaded.uploadError });
     },
   };
 
@@ -274,7 +242,7 @@ export function createEditingTools(deps: ToolRuntimeDeps): AgentTool[] {
     },
     handler: async (args) => {
       const srt = typeof args.srtData === 'string' ? args.srtData : deps.srtText ?? '';
-      if (!srt) return JSON.stringify({ success: false, error: '无 SRT 字幕数据' });
+      if (!srt) return JSON.stringify({ ok: false, error: '无 SRT 字幕数据' });
       const fontSize = Math.max(8, Math.min(72, Math.floor(num(args, 'fontSize', 24))));
       const fontColor = sanitizeFontColor(String(args.fontColor ?? '#FFFFFF'));
       const srtPath = path.join(deps.outputBaseDir, `subs_${Date.now()}.srt`);
@@ -290,13 +258,13 @@ export function createEditingTools(deps: ToolRuntimeDeps): AgentTool[] {
         ],
       });
       if (!result.success) {
-        return JSON.stringify({ success: false, error: result.stderr.slice(0, 500) });
+        return JSON.stringify({ ok: false, error: result.stderr.slice(0, 500) });
       }
       try {
         const uploaded = await uploadResult(outputPath, deps);
-        return JSON.stringify({ success: true, objectUrl: uploaded.objectUrl, outputPath, uploadError: uploaded.uploadError });
+        return JSON.stringify({ ok: true, message: '字幕烧录完成', wosUrl: uploaded.objectUrl, outputPath, uploadError: uploaded.uploadError });
       } catch (err) {
-        return JSON.stringify({ success: true, outputPath, uploadError: err instanceof Error ? err.message : String(err) });
+        return JSON.stringify({ ok: true, message: '字幕烧录完成（未上传）', outputPath, uploadError: err instanceof Error ? err.message : String(err) });
       }
     },
   };
@@ -334,7 +302,7 @@ export function createEditingTools(deps: ToolRuntimeDeps): AgentTool[] {
             outputPath,
           ],
         });
-        if (!result.success) return JSON.stringify({ success: false, error: result.stderr.slice(0, 500) });
+        if (!result.success) return JSON.stringify({ ok: false, error: result.stderr.slice(0, 500) });
       } else {
         const res = await window.viewPoint.clipSegment({
           inputPath: deps.videoPath,
@@ -343,29 +311,13 @@ export function createEditingTools(deps: ToolRuntimeDeps): AgentTool[] {
           outputPath,
           originalClipVolume: ORIGINAL_CLIP_VOLUME,
         });
-        if (!res.success) return JSON.stringify({ success: false, error: res.error ?? '导出失败' });
+        if (!res.success) return JSON.stringify({ ok: false, error: res.error ?? '导出失败' });
       }
       const uploaded = await uploadResult(outputPath, deps);
-      return JSON.stringify({ success: true, objectUrl: uploaded.objectUrl, outputPath, format, uploadError: uploaded.uploadError });
+      return JSON.stringify({ ok: true, message: format === 'gif' ? 'GIF 导出完成' : '片段导出完成', wosUrl: uploaded.objectUrl, outputPath, format, uploadError: uploaded.uploadError });
     },
   };
 
   return [clipAndConcat, removeSilence, burnSubtitles, exportSegment];
 }
 
-function extractSilenceSegments(stderr: string): Array<{ start: number; end: number }> {
-  const starts: number[] = [];
-  const ends: number[] = [];
-  let m: RegExpExecArray | null;
-  const startRe = /silence_start:\s*(-?\d+\.?\d*)/g;
-  while ((m = startRe.exec(stderr)) !== null) starts.push(Math.max(0, parseFloat(m[1])));
-  const endRe = /silence_end:\s*(-?\d+\.?\d*)/g;
-  while ((m = endRe.exec(stderr)) !== null) ends.push(parseFloat(m[1]));
-  const segments: Array<{ start: number; end: number }> = [];
-  for (let i =  0; i < starts.length; i++) {
-    const start = starts[i];
-    const end = ends[i] ?? start;
-    if (end > start) segments.push({ start, end });
-  }
-  return segments;
-}

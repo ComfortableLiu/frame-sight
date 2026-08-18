@@ -64,3 +64,6 @@ export default modelConfigSlice.reducer;
 
 export const selectModelConfig = (state: { modelConfig: ModelConfigState }): ModelConfig =>
   state.modelConfig.config;
+
+export const selectModelConfigLoaded = (state: { modelConfig: ModelConfigState }): boolean =>
+  state.modelConfig.loaded;

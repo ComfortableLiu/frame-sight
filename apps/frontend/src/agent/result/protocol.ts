@@ -1,4 +1,5 @@
 import type { ResultPayload } from '../types.js';
+import { extractFirstJsonObject } from '../react/parser.js';
 
 const FENCE = 'agent_result';
 
@@ -60,32 +61,3 @@ function tryParse(candidate: string): ResultPayload | null {
   return null;
 }
 
-function extractFirstJsonObject(text: string): Record<string, unknown> | null {
-  const start = text.indexOf('{');
-  if (start === -1) return null;
-  let depth = 0;
-  let inString = false;
-  let escape = false;
-  for (let i = start; i < text.length; i++) {
-    const ch = text[i];
-    if (inString) {
-      if (escape) escape = false;
-      else if (ch === '\\') escape = true;
-      else if (ch === '"') inString = false;
-    } else {
-      if (ch === '"') inString = true;
-      else if (ch === '{') depth++;
-      else if (ch === '}') {
-        depth--;
-        if (depth === 0) {
-          try {
-            return JSON.parse(text.slice(start, i + 1));
-          } catch {
-            return null;
-          }
-        }
-      }
-    }
-  }
-  return null;
-}

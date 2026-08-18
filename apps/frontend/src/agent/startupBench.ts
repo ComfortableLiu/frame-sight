@@ -8,6 +8,7 @@
  */
 
 import type { LlmCaller, LlmEndpoint } from './types.js';
+import { benchmarkFfmpeg } from './benchmark.js';
 
 const STORAGE_KEY = 'frame-sight:startup-bench';
 
@@ -55,7 +56,7 @@ export async function runStartupBench(
   endpoint: LlmEndpoint | null,
 ): Promise<{ result: StartupBenchResult; description: string }> {
   const [ffmpegResult, llmResult] = await Promise.allSettled([
-    benchFfmpeg(),
+    benchmarkFfmpeg(),
     endpoint ? benchLlm(createCaller(endpoint)) : Promise.resolve(null),
   ]);
 
@@ -81,17 +82,6 @@ export async function runStartupBench(
   return { result, description };
 }
 
-async function benchFfmpeg(): Promise<number> {
-  const start = performance.now();
-  const result = await window.viewPoint.ffmpegExecute({
-    args: ['-f', 'lavfi', '-i', 'testsrc=duration=2:size=320x240:rate=10', '-f', 'null', '-'],
-  });
-  if (!result?.success) {
-    throw new Error('ffmpeg 测速失败');
-  }
-  const elapsed = (performance.now() - start) / 1000;
-  return Math.max(0.5, 2 / elapsed);
-}
 
 async function benchLlm(caller: LlmCaller): Promise<{ firstTokenMs: number; tokensPerSec: number }> {
   const start = performance.now();

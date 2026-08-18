@@ -1,6 +1,18 @@
 import Store from 'electron-store';
 import * as crypto from 'node:crypto';
 
+export interface ModelCapabilities {
+  audio: boolean;
+  video: boolean;
+  image: boolean;
+  text: boolean;
+}
+
+export interface ModelSettings {
+  contextWindow?: number;
+  capabilities?: ModelCapabilities;
+}
+
 export interface ModelPlatform {
   id: string;
   name: string;
@@ -9,10 +21,16 @@ export interface ModelPlatform {
   models: string[];
   selectedModels: string[];
   contextWindows: Record<string, number>;
+  modelSettings?: Record<string, ModelSettings>;
 }
 
 export interface ModelConfig {
   platforms: ModelPlatform[];
+  analysisModels?: {
+    speech?: string;
+    video?: string;
+    text?: string;
+  };
 }
 
 export interface LegacyModelEngineEntry {
@@ -50,6 +68,7 @@ export class ModelConfigService {
     const existingIdx = platform.id
       ? config.platforms.findIndex((p) => p.id === platform.id)
       : -1;
+    const existing = existingIdx >= 0 ? config.platforms[existingIdx] : undefined;
     const record: ModelPlatform = {
       id: platform.id ?? crypto.randomUUID(),
       name: platform.name,
@@ -58,6 +77,8 @@ export class ModelConfigService {
       models: platform.models ?? [],
       selectedModels: platform.selectedModels ?? [],
       contextWindows: platform.contextWindows ?? {},
+      // 透传保留 modelSettings，未提供时沿用已有值
+      modelSettings: platform.modelSettings ?? existing?.modelSettings,
     };
     if (existingIdx >= 0) {
       config.platforms[existingIdx] = record;

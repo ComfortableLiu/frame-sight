@@ -31,10 +31,13 @@ function buildBody(endpoint: LlmEndpoint, messages: LlmMessage[], options?: LlmC
   const body: Record<string, unknown> = {
     model: endpoint.modelName,
     messages,
-    max_tokens: options?.maxTokens ?? 8000,
     stream: true,
     stream_options: { include_usage: true },
   };
+  // 未显式指定时不传 max_tokens，由服务端按模型默认上限生成，避免截断长输出
+  if (options?.maxTokens != null) {
+    body.max_tokens = options.maxTokens;
+  }
   if (endpoint.supportsThinking && options?.enableThinking) {
     body.enable_thinking = true;
   }

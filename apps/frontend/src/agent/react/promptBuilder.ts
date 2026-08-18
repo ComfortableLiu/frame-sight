@@ -113,13 +113,8 @@ export function buildToolResultMessage(
   };
 }
 
-/** 移除 <thinking>...</thinking> 围栏内容。 */
-export function filterThinkingFromMessages(messages: LlmMessage[]): LlmMessage[] {
-  return messages.map((m) => ({
-    ...m,
-    content: m.content.replace(/<thinking>[\s\S]*?<\/thinking>/g, '').trim(),
-  }));
-}
+// Re-export from contextManager（canonical implementation, handles unclosed tags）
+export { filterThinkingFromMessages } from '../llm/contextManager.js';
 
 function truncate(text: string, max: number): string {
   if (text.length <= max) return text;

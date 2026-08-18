@@ -44,7 +44,10 @@ export function resolveModelChatEndpoint(
   if (!parsed) return null;
   const platform = findPlatform(config, parsed.platform);
   if (!platform) return null;
-  const contextWindow = platform.contextWindows?.[parsed.modelName];
+  // 优先读 modelSettings，回退旧字段 contextWindows（兼容旧数据）
+  const contextWindow =
+    platform.modelSettings?.[parsed.modelName]?.contextWindow ??
+    platform.contextWindows?.[parsed.modelName];
   return {
     apiBase: platform.apiBase,
     apiKey: platform.apiKey,

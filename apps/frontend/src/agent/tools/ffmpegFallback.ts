@@ -83,14 +83,17 @@ export function createFfmpegFallbackTool(outputBaseDir: string): AgentTool {
       const cmdArgs = Array.isArray(args.args) ? (args.args as string[]) : [];
       const validation = validateFfmpegCommand(cmdArgs, outputBaseDir);
       if (!validation.valid) {
-        return JSON.stringify({ success: false, error: validation.error });
+        return JSON.stringify({ ok: false, error: validation.error });
       }
       const result = await window.viewPoint.ffmpegExecute({ args: cmdArgs });
       return JSON.stringify({
-        success: result.success,
-        exitCode: result.exitCode,
-        stdout: result.stdout.slice(0, 2000),
-        stderr: result.stderr.slice(0, 2000),
+        ok: result.success,
+        message: result.success ? 'FFmpeg 执行完成' : 'FFmpeg 执行失败',
+        error: result.success ? undefined : result.stderr.slice(0, 300),
+        content: {
+          format: 'json',
+          data: { exitCode: result.exitCode, stdout: result.stdout.slice(0, 2000), stderr: result.stderr.slice(0, 2000) },
+        },
         outputPath: findOutputPath(cmdArgs) ?? undefined,
       });
     },

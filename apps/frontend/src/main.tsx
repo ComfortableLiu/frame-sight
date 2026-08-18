@@ -10,6 +10,7 @@ import { store, cacheLoad } from './store/index.js';
 import { RouterProvider, useRouter } from './modules/router/Router.js';
 import { AgentPage } from './modules/pages/AgentPage.js';
 import { SettingsPage } from './modules/pages/SettingsPage.js';
+import { ErrorBoundary } from './modules/ErrorBoundary.js';
 import './styles.css';
 
 // ── 主题初始化（React 挂载前，避免闪烁） ──
@@ -44,9 +45,11 @@ const container = document.getElementById('root');
 if (container) {
   createRoot(container).render(
     <React.StrictMode>
-      <Provider store={store}>
-        <App />
-      </Provider>
+      <ErrorBoundary>
+        <Provider store={store}>
+          <App />
+        </Provider>
+      </ErrorBoundary>
     </React.StrictMode>,
   );
 }

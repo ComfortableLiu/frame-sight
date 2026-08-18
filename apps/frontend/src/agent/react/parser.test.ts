@@ -24,6 +24,22 @@ describe('parseToolCallFromText', () => {
     expect(call!.name).toBe('export_segment');
   });
 
+  it('skips leading non-tool JSON objects (e.g. todos) and finds the tool_call', () => {
+    // 模型先输出裸 todos JSON 再输出裸 tool_call 时，第一个 {} 是 todo 项，不能卡住解析
+    const text =
+      '[{"id":"t1","description":"剪辑"}]\n{"name": "clip_and_concat", "arguments": {"segments": [{"startMs": 386000, "endMs": 438000}, {"startMs": 544000, "endMs": 649000}, {"startMs": 790000, "endMs": 827000}]}}';
+    const call = parseToolCallFromText(text);
+    expect(call).not.toBeNull();
+    expect(call!.name).toBe('clip_and_concat');
+    expect((call!.arguments.segments as unknown[]).length).toBe(3);
+  });
+
+  it('skips unparseable leading braces', () => {
+    const text = '备注 {无效json {"name":"detect_silence","arguments":{"minDurationSec":1}}';
+    const call = parseToolCallFromText(text);
+    expect(call!.name).toBe('detect_silence');
+  });
+
   it('returns null when no tool call', () => {
     expect(parseToolCallFromText('just text')).toBeNull();
   });

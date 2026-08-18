@@ -88,11 +88,8 @@ export class AgentScriptToolService {
       errors.push('工具名须为 snake_case');
     }
     const src = manifest.source ?? '';
-    if (
-      !/\bfunction\s+main\s*\(/.test(src) &&
-      !/async\s+function\s+main\s*\(/.test(src)
-    ) {
-      errors.push('源码必须包含 function main(input, ctx) 入口');
+    if (!/\b(main\s*(=|:)|function\s+main\s*\()/i.test(src)) {
+      errors.push('源码必须包含 main 入口函数（function main(...) 或 const main = ...）');
     }
     if (src.length > LIMITS.maxSourceChars) {
       errors.push(`源码超长（>${LIMITS.maxSourceChars} 字符）`);
@@ -178,7 +175,15 @@ export class AgentScriptToolService {
       try {
         const sandbox = { ...ctx, args, main: undefined as unknown };
         vm.createContext(sandbox);
-        tool.script.runInContext(sandbox as vm.Context);
+        // Wrap source to ensure main is assigned to sandbox even for const/let/arrow declarations
+        const wrappedSource =
+          tool.manifest.source + '\n;if (typeof main !== \'undefined\' && typeof this.main === \'undefined\') { this.main = main; }';
+        try {
+          new vm.Script(wrappedSource, { filename: tool.manifest.name + '.js' }).runInContext(sandbox as vm.Context);
+        } catch {
+          // Fallback: run original source (function declarations are hoisted)
+          tool.script.runInContext(sandbox as vm.Context);
+        }
         const mainFn = (sandbox as { main?: (...a: unknown[]) => unknown }).main;
         if (typeof mainFn !== 'function') {
           return { success: false, output: '', error: '未找到 main 入口函数' };

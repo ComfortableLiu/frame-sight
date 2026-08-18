@@ -28,6 +28,8 @@ export interface AgentChatMessage {
   cancelled?: boolean;
   /** 中间步骤消息（轻量样式） */
   isStepMessage?: boolean;
+  /** 执行状态消息（阶段流转，轻量样式） */
+  isStatusMessage?: boolean;
   toolCallName?: string;
   toolCallArgs?: Record<string, unknown>;
   toolCallResult?: ToolCallResultSnapshot;

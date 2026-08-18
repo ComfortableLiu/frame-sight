@@ -1,4 +1,5 @@
 import Store from 'electron-store';
+import { safeStorage } from 'electron';
 import * as path from 'node:path';
 import {
   S3Client,
@@ -17,6 +18,8 @@ export interface StorageConfig {
   secretAccessKey: string;
   publicUrlBase: string;
   forcePathStyle: boolean;
+  /** 上传文件目录（key 前缀），留空默认 agent-outputs */
+  directory: string;
 }
 
 export interface StorageSnapshot {
@@ -36,16 +39,29 @@ export class StorageService {
   }
 
   getConfig(): StorageSnapshot {
-    return { config: this.store.get('config') };
+    const config = this.store.get('config');
+    if (config?.secretAccessKey && (config as unknown as Record<string, unknown>).__encrypted && safeStorage.isEncryptionAvailable()) {
+      try {
+        const decrypted = safeStorage.decryptString(Buffer.from(config.secretAccessKey, 'base64'));
+        return { config: { ...config, secretAccessKey: decrypted } };
+      } catch { /* 降级：返回原值 */ }
+    }
+    return { config };
   }
 
   saveConfig(config: StorageConfig): void {
-    this.store.set('config', config);
+    const toStore = { ...config };
+    if (toStore.secretAccessKey && safeStorage.isEncryptionAvailable()) {
+      toStore.secretAccessKey = safeStorage.encryptString(toStore.secretAccessKey).toString('base64');
+      (toStore as unknown as Record<string, unknown>).__encrypted = true;
+    }
+    this.store.set('config', toStore);
     this.clientCache = null;
   }
 
   private getClient(): S3Client {
-    const config = this.store.get('config');
+    const snapshot = this.getConfig();
+    const config = snapshot.config;
     if (!config) throw new Error('未配置对象存储，请先在设置中配置');
     // key 包含所有配置字段，改 bucket/密钥/style 时重建 client
     const key = `${config.endpoint}|${config.region}|${config.bucket}|${config.accessKeyId}|${config.forcePathStyle}`;
@@ -58,6 +74,9 @@ export class StorageService {
         secretAccessKey: config.secretAccessKey,
       },
       forcePathStyle: config.forcePathStyle,
+      // 兼容 MinIO 等 S3 兼容存储：不使用默认 CRC32 校验和（会触发 aws-chunked 流式编码）
+      requestChecksumCalculation: 'WHEN_REQUIRED',
+      responseChecksumValidation: 'WHEN_REQUIRED',
     });
     this.cachedKey = key;
     return this.clientCache;
@@ -84,10 +103,11 @@ export class StorageService {
     if (!fs.existsSync(filePath)) {
       return { objectUrl: '', error: `文件不存在: ${filePath}` };
     }
-    const body = fs.createReadStream(filePath);
-    body.on('error', () => {}); // 防止未监听 error 抛出
+    // 读 Buffer 而非流：避免 SDK 对流式 Body 使用 aws-chunked 编码（部分 S3 兼容存储不支持）
+    const body = fs.readFileSync(filePath);
     const ext = path.extname(filePath);
-    const key = `agent-outputs/${randomUUID()}${ext}`;
+    const dir = (config.directory ?? '').replace(/^\/+|\/+$/g, '') || 'agent-outputs';
+    const key = `${dir}/${randomUUID()}${ext}`;
 
     try {
       await client.send(
@@ -112,8 +132,6 @@ export class StorageService {
       return { objectUrl };
     } catch (err) {
       return { objectUrl: '', error: err instanceof Error ? err.message : String(err) };
-    } finally {
-      body.destroy();
     }
   }
 
@@ -127,6 +145,8 @@ export class StorageService {
           secretAccessKey: config.secretAccessKey,
         },
         forcePathStyle: config.forcePathStyle,
+        requestChecksumCalculation: 'WHEN_REQUIRED',
+        responseChecksumValidation: 'WHEN_REQUIRED',
       });
       await client.send(new HeadBucketCommand({ Bucket: config.bucket }));
       return { success: true, message: '连接成功，bucket 可访问' };

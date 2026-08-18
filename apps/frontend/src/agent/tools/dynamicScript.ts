@@ -25,8 +25,8 @@ export function validateDynamicManifest(manifest: DynamicScriptManifest): {
   if (!/^[a-z0-9_]+$/.test(manifest.name)) {
     errors.push('工具名须为 snake_case');
   }
-  if (!/\bfunction\s+main\s*\(/.test(manifest.source) && !/async\s+function\s+main\s*\(/.test(manifest.source)) {
-    errors.push('源码必须包含 function main(input, ctx) 入口');
+  if (!/\b(main\s*(=|:)|function\s+main\s*\()/i.test(manifest.source)) {
+    errors.push('源码必须包含 main 入口函数（function main(...) 或 const main = ...）');
   }
   if (manifest.source.length > DYNAMIC_SCRIPT_LIMITS.maxSourceChars) {
     errors.push(`源码超长（>${DYNAMIC_SCRIPT_LIMITS.maxSourceChars} 字符）`);

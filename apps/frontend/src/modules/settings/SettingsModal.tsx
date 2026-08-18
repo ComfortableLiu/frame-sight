@@ -295,5 +295,5 @@ function StorageTab(): JSX.Element {
 }
 
 function defaultStorage(): StorageConfig {
-  return { endpoint: '', region: 'us-east-1', bucket: '', accessKeyId: '', secretAccessKey: '', publicUrlBase: '', forcePathStyle: false };
+  return { endpoint: '', region: 'us-east-1', bucket: '', accessKeyId: '', secretAccessKey: '', publicUrlBase: '', forcePathStyle: false, directory: '' };
 }
