@@ -9,7 +9,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ant-design/icons": "^6.3.4",
     "@reduxjs/toolkit": "^2.2.7",
+    "antd": "^5.22.0",
     "mermaid": "^11.16.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

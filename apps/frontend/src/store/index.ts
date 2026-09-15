@@ -4,50 +4,77 @@ import flowReducer, {
   selectAgentSessionsSorted,
 } from './flowSlice.js';
 import modelConfigReducer from './modelConfigSlice.js';
+import commentaryReducer, { type CommentaryState } from './commentarySlice.js';
 
 const CACHE_KEY = 'frame-sight:flow-cache';
+const COMMENTARY_CACHE_KEY = 'frame-sight:commentary-cache';
 
 export interface RootState {
   flow: FlowState;
   modelConfig: ReturnType<typeof modelConfigReducer>;
+  commentary: CommentaryState;
 }
 
 export const store = configureStore({
   reducer: {
     flow: flowReducer,
     modelConfig: modelConfigReducer,
+    commentary: commentaryReducer,
   },
 });
 
-// ── cacheSave 持久化：会话状态落盘到 localStorage ──
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
 export function cacheSave(): void {
   try {
     const state = store.getState();
-    const data = {
-      flow: state.flow,
-    };
-    localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ flow: state.flow }));
   } catch {
-    // 忽略序列化/存储错误
+    // ignore
   }
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try {
+      const state = store.getState();
+      localStorage.setItem(
+        COMMENTARY_CACHE_KEY,
+        JSON.stringify({ commentary: state.commentary }),
+      );
+    } catch {
+      // ignore
+    }
+  }, 500);
 }
 
 export function cacheLoad(): void {
   try {
     const raw = localStorage.getItem(CACHE_KEY);
-    if (!raw) return;
-    const data = JSON.parse(raw);
-    if (data?.flow) {
-      store.dispatch({
-        type: 'flow/restoreState',
-        payload: data.flow,
-      });
+    if (raw) {
+      const data = JSON.parse(raw);
+      if (data?.flow) {
+        store.dispatch({ type: 'flow/restoreState', payload: data.flow });
+      }
     }
   } catch {
-    // 忽略
+    // ignore
+  }
+  try {
+    const raw = localStorage.getItem(COMMENTARY_CACHE_KEY);
+    if (raw) {
+      const data = JSON.parse(raw);
+      if (data?.commentary) {
+        store.dispatch({ type: 'commentary/restoreCommentaryState', payload: data.commentary });
+      }
+    }
+  } catch {
+    // ignore
   }
 }
+
+// 自动订阅保存
+store.subscribe(() => {
+  cacheSave();
+});
 
 export type AppDispatch = typeof store.dispatch;
 export { selectAgentSessionsSorted };

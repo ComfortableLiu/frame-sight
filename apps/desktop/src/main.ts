@@ -2,6 +2,11 @@ import { app, BrowserWindow } from 'electron';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { registerAllIpcHandlers } from './ipc.js';
+import { registerCommentaryIpcHandlers } from './commentary-ipc.js';
+import {
+  registerLocalMediaProtocol,
+  handleLocalMediaProtocol,
+} from './local-media-protocol.js';
 import { AgentScriptToolService } from './agent-script-tool.service.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -30,13 +35,19 @@ function createWindow(): void {
   }
 }
 
+// 必须在 app ready 前注册特权 scheme
+registerLocalMediaProtocol();
+
 app.whenReady().then(() => {
+  handleLocalMediaProtocol();
+
   const mediaRoot = path.join(app.getPath('userData'), 'media');
   const scriptService = new AgentScriptToolService(
     path.join(mediaRoot, 'agent-outputs'),
   );
 
   registerAllIpcHandlers({ mediaRoot, scriptService });
+  registerCommentaryIpcHandlers(mediaRoot);
 
   createWindow();
 

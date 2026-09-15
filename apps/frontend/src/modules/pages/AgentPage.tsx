@@ -644,6 +644,16 @@ export function AgentPage(): JSX.Element {
             </button>
           </div>
 
+          <button
+            className="btn"
+            onClick={() => {
+              dispatch({ type: 'commentary/setFlowMode', payload: 'normal' });
+              pushRoute('commentary-step-1');
+            }}
+            title="进入影视剧解说七步工作流"
+          >
+            🎬 解说模式
+          </button>
           <button className="btn" onClick={() => pushRoute('settings')}>
             ⚙ 设置
           </button>
