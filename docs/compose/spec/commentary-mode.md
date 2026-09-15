@@ -1,14 +1,20 @@
 ---
 feature: commentary-mode
-status: in-progress
+status: delivered
 updated: 2026-09-15
 branch: feat/commentary-mode
-commits: be9b479..HEAD
+commits: be9b479..03c747c
 ---
 
 # 影视剧解说模式（normal 七步工作流）
 
 ## Report
+
+**What was built** — 在 Frame Sight 中落地与 Agent 模式共存的「影视剧解说」七步工作流：Agent 顶栏可进入解说模式，Step1 上传/压缩/S3 上传/多模态 SRT 与结构化报告（>600s 分段）/剧情拆解/抓眼钩子/分段脚本；Step2~5 裁剪、TTS 配音、合并烧字幕、拼接成片（BGM/水印/强制画幅）；Step6 封面与可拖拽文字；Step7 LLM 选点嵌入广告。主进程新增 local-media 协议、解说媒体服务与 IPC；状态落在 commentarySlice 并 localStorage 持久化。
+
+**Verification** — `yarn typecheck` PASS；`yarn test` PASS（94 tests / 12 files）；`yarn build` PASS。
+
+**Journey log** — 首版实现后独立 review 指出路径穿越、>600s 报告未分段、钩子零起点重试死代码、时间戳未归一、Step2/6/7 交互与契约缺口、成片取消无效、广告 A/V 错位等 critical，已在 03c747c 集中修复。上传侧适配为 S3（非 ViewPoint WOS）；Demucs 按 out-of-scope 仅保留 FFmpeg 路径。antd 5 仅包裹解说页 UI，Agent 页样式保持不变。
 
 ## [S1] Problem
 
@@ -150,14 +156,14 @@ key 约定：
 
 ## Tasks
 
-- [ ] T1: 脚本类型与工具 — `types/script.ts` 解析/归一/时间工具 + 单测 — acceptance: parse/normalize/entries 测试通过 (covers: S2.2)
-- [ ] T2: commentarySlice 与缓存 — 状态、reducers、selectors、localStorage 恢复清洗 — acceptance: typecheck + 默认态/恢复逻辑正确 (covers: S2.3)
-- [ ] T3: local-media 协议 — 主进程协议注册与 token 映射 — acceptance: 注册后可返回文件流 (covers: S2.4)
-- [ ] T4: 媒体服务扩展 — clip/merge/burn/compose/cover/ad/export/progress — acceptance: 各方法参数校验与标准编码命令可执行 (covers: S2.6)
-- [ ] T5: IPC/preload/类型契约 — 解说模式全部 vp 通道 — acceptance: 三文件同步，typecheck 通过 (covers: S2.5)
-- [ ] T6: TTS 与上传适配 — generateVoice + S3 上传包装 — acceptance: 配置缺失时报错清晰；配置齐全时写 wav (covers: S2.9)
-- [ ] T7: 路由/StepGuard/FlowLayout/模式切换 — 七步导航与门禁 — acceptance: 越步重定向；可切 Agent (covers: S2.1)
-- [ ] T8: Step1 提示词与编排 — prompts + 报告/SRT/拆解/钩子/分段脚本 — acceptance: 有 mock 时写出 script；时间戳校验生效 (covers: S2.7)
-- [ ] T9: Step2~4 页面 — 裁剪/配音/合并字幕 — acceptance: 单条与批量可跑；产物写回 Redux (covers: S2.8)
-- [ ] T10: Step5~7 页面与设置广告库 — 成片/封面/广告 — acceptance: 有前置产物时可合成与导出 (covers: S2.8)
-- [ ] T11: 集成验证 — typecheck + test + 关键路径走查 — acceptance: `yarn typecheck`、`yarn test` 通过 (covers: S2)
+- [x] T1: 脚本类型与工具 — `types/script.ts` 解析/归一/时间工具 + 单测 — acceptance: parse/normalize/entries 测试通过 (covers: S2.2)
+- [x] T2: commentarySlice 与缓存 — 状态、reducers、selectors、localStorage 恢复清洗 — acceptance: typecheck + 默认态/恢复逻辑正确 (covers: S2.3)
+- [x] T3: local-media 协议 — 主进程协议注册与 token 映射 — acceptance: 注册后可返回文件流 (covers: S2.4)
+- [x] T4: 媒体服务扩展 — clip/merge/burn/compose/cover/ad/export/progress — acceptance: 各方法参数校验与标准编码命令可执行 (covers: S2.6)
+- [x] T5: IPC/preload/类型契约 — 解说模式全部 vp 通道 — acceptance: 三文件同步，typecheck 通过 (covers: S2.5)
+- [x] T6: TTS 与上传适配 — generateVoice + S3 上传包装 — acceptance: 配置缺失时报错清晰；配置齐全时写 wav (covers: S2.9)
+- [x] T7: 路由/StepGuard/FlowLayout/模式切换 — 七步导航与门禁 — acceptance: 越步重定向；可切 Agent (covers: S2.1)
+- [x] T8: Step1 提示词与编排 — prompts + 报告/SRT/拆解/钩子/分段脚本 — acceptance: 有 mock 时写出 script；时间戳校验生效 (covers: S2.7)
+- [x] T9: Step2~4 页面 — 裁剪/配音/合并字幕 — acceptance: 单条与批量可跑；产物写回 Redux (covers: S2.8)
+- [x] T10: Step5~7 页面与设置广告库 — 成片/封面/广告 — acceptance: 有前置产物时可合成与导出 (covers: S2.8)
+- [x] T11: 集成验证 — typecheck + test + 关键路径走查 — acceptance: `yarn typecheck`、`yarn test` 通过 (covers: S2)
