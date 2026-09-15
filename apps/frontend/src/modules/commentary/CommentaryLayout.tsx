@@ -95,10 +95,10 @@ export function CommentaryLayout(): JSX.Element {
             size="small"
             onClick={() => {
               dispatch(setFlowMode('agent'));
-              replace('agent');
+              replace('home');
             }}
           >
-            切换到 Agent 模式
+            返回首页
           </Button>
         </Space>
         <Typography.Text type="secondary">模式：{flowMode === 'normal' ? '解说' : 'Agent'}</Typography.Text>

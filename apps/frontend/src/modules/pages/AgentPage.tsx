@@ -646,6 +646,13 @@ export function AgentPage(): JSX.Element {
 
           <button
             className="btn"
+            onClick={() => pushRoute('home')}
+            title="返回模式选择首页"
+          >
+            首页
+          </button>
+          <button
+            className="btn"
             onClick={() => {
               dispatch({ type: 'commentary/setFlowMode', payload: 'normal' });
               pushRoute('commentary-step-1');

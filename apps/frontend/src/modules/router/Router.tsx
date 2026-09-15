@@ -8,6 +8,7 @@ import {
 } from 'react';
 
 export type RouteName =
+  | 'home'
   | 'agent'
   | 'settings'
   | 'commentary-step-1'
@@ -33,7 +34,7 @@ interface RouterCtx {
 
 const RouterContext = createContext<RouterCtx | null>(null);
 
-const DEFAULT_ROUTE: RouteName = 'agent';
+const DEFAULT_ROUTE: RouteName = 'home';
 
 export function routeToStep(name: RouteName): number | null {
   const m = name.match(/^commentary-step-(\d)$/);

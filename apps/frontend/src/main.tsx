@@ -12,6 +12,7 @@ import { store, cacheLoad } from './store/index.js';
 import { RouterProvider, useRouter } from './modules/router/Router.js';
 import { AgentPage } from './modules/pages/AgentPage.js';
 import { SettingsPage } from './modules/pages/SettingsPage.js';
+import { HomePage } from './modules/pages/HomePage.js';
 import { CommentaryLayout } from './modules/commentary/CommentaryLayout.js';
 import { ErrorBoundary } from './modules/ErrorBoundary.js';
 import './styles.css';
@@ -34,8 +35,10 @@ function AppRouter(): JSX.Element {
     case 'settings':
       return <SettingsPage />;
     case 'agent':
-    default:
       return <AgentPage />;
+    case 'home':
+    default:
+      return <HomePage />;
   }
 }
 
