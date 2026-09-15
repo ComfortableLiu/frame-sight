@@ -9,6 +9,7 @@ import {
   setFlowMode,
 } from '../../store/commentarySlice.js';
 import { useRouter, stepToRoute, routeToStep } from '../router/Router.js';
+import { useTheme } from '../../hooks/useTheme.js';
 import { Step1Page } from './Step1Page.js';
 import { Step2Page } from './Step2Page.js';
 import { Step3Page } from './Step3Page.js';
@@ -26,6 +27,30 @@ const STEP_TITLES = [
   '封面文字',
   '嵌入广告',
 ];
+
+function ThemeSwitcherMini(): JSX.Element {
+  const { mode, setMode } = useTheme();
+  return (
+    <Space size={4}>
+      {(
+        [
+          ['light', '浅色'],
+          ['dark', '深色'],
+          ['system', '系统'],
+        ] as const
+      ).map(([key, label]) => (
+        <Button
+          key={key}
+          size="small"
+          type={mode === key ? 'primary' : 'default'}
+          onClick={() => setMode(key)}
+        >
+          {label}
+        </Button>
+      ))}
+    </Space>
+  );
+}
 
 export function CommentaryLayout(): JSX.Element {
   const dispatch = useDispatch();
@@ -77,14 +102,15 @@ export function CommentaryLayout(): JSX.Element {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-base, #0f1117)', color: 'var(--text-primary, #e4e6f0)' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg-base)', color: 'var(--text-primary)' }}>
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '12px 20px',
-          borderBottom: '1px solid var(--border, #2a2d42)',
+          borderBottom: '1px solid var(--border)',
+          background: 'var(--bg-surface)',
         }}
       >
         <Space>
@@ -101,7 +127,10 @@ export function CommentaryLayout(): JSX.Element {
             返回首页
           </Button>
         </Space>
-        <Typography.Text type="secondary">模式：{flowMode === 'normal' ? '解说' : 'Agent'}</Typography.Text>
+        <Space>
+          <ThemeSwitcherMini />
+          <Typography.Text type="secondary">模式：{flowMode === 'normal' ? '解说' : 'Agent'}</Typography.Text>
+        </Space>
       </div>
       <div style={{ padding: '12px 20px 0' }}>
         <Steps
