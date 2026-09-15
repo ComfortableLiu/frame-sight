@@ -644,6 +644,23 @@ export function AgentPage(): JSX.Element {
             </button>
           </div>
 
+          <button
+            className="btn"
+            onClick={() => pushRoute('home')}
+            title="返回模式选择首页"
+          >
+            首页
+          </button>
+          <button
+            className="btn"
+            onClick={() => {
+              dispatch({ type: 'commentary/setFlowMode', payload: 'normal' });
+              pushRoute('commentary-step-1');
+            }}
+            title="进入影视剧解说七步工作流"
+          >
+            影视解说
+          </button>
           <button className="btn" onClick={() => pushRoute('settings')}>
             ⚙ 设置
           </button>
@@ -658,7 +675,70 @@ export function AgentPage(): JSX.Element {
             {(!currentSession || currentSession.messages.length === 0) && (
               <div className="chat-empty">
                 <div className="chat-empty-icon">💬</div>
-                <div>{videoPath ? '输入需求开始对话' : '请先选择一个视频文件'}</div>
+                <div style={{ marginBottom: 8 }}>{videoPath ? '输入需求开始对话' : '请先选择一个视频文件'}</div>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: 12,
+                    justifyContent: 'center',
+                    marginTop: 16,
+                    maxWidth: 520,
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      dispatch({ type: 'commentary/setFlowMode', payload: 'normal' });
+                      pushRoute('commentary-step-1');
+                    }}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'flex-start',
+                      gap: 6,
+                      padding: '14px 16px',
+                      minWidth: 220,
+                      borderRadius: 12,
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-surface)',
+                      color: 'var(--text-primary)',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                    title="进入影视剧解说七步工作流"
+                  >
+                    <span style={{ fontWeight: 600, fontSize: 14 }}>影视剧解说模式</span>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: 12, lineHeight: 1.5 }}>
+                      上传原片 → 脚本 → 裁剪 → 配音 → 字幕 → 成片 → 封面 → 广告
+                    </span>
+                    <span style={{ color: 'var(--success)', fontSize: 12, fontWeight: 500 }}>开始七步流程 →</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => pushRoute('home')}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'flex-start',
+                      gap: 6,
+                      padding: '14px 16px',
+                      minWidth: 180,
+                      borderRadius: 12,
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-surface)',
+                      color: 'var(--text-primary)',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                    title="返回模式选择首页"
+                  >
+                    <span style={{ fontWeight: 600, fontSize: 14 }}>模式首页</span>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: 12, lineHeight: 1.5 }}>
+                      在 Agent 与解说模式之间切换
+                    </span>
+                  </button>
+                </div>
               </div>
             )}
             {currentSession?.messages.map((msg) => (
@@ -792,6 +872,36 @@ export function AgentPage(): JSX.Element {
           >
             + 新会话
           </button>
+          <div
+            style={{
+              marginTop: 12,
+              paddingTop: 12,
+              borderTop: '1px solid var(--border)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+            }}
+          >
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>其他模式</div>
+            <button
+              className="btn"
+              style={{ width: '100%', justifyContent: 'flex-start' }}
+              onClick={() => {
+                dispatch({ type: 'commentary/setFlowMode', payload: 'normal' });
+                pushRoute('commentary-step-1');
+              }}
+              title="进入影视剧解说七步工作流"
+            >
+              影视剧解说
+            </button>
+            <button
+              className="btn"
+              style={{ width: '100%', justifyContent: 'flex-start' }}
+              onClick={() => pushRoute('home')}
+            >
+              模式首页
+            </button>
+          </div>
         </div>
       </div>
 

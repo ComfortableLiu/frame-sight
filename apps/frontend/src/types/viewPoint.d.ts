@@ -142,6 +142,120 @@ export interface ViewPointApi {
   agentScriptToolRegister: (payload: AgentScriptToolRegisterPayload) => Promise<{ success: boolean; error?: string; tool?: DynamicToolDescriptor }>;
   agentScriptToolExecute: (request: AgentScriptToolExecuteRequest) => Promise<AgentScriptToolExecutionResult>;
   agentScriptToolCleanup: (runId: string) => Promise<{ success: boolean }>;
+
+  // ── 影视解说模式 ──
+  pickImageFile: () => Promise<{ canceled: boolean; filePath?: string; previewUrl?: string; error?: string }>;
+  pickAudioFile: () => Promise<{ canceled: boolean; filePath?: string; previewUrl?: string; error?: string }>;
+  getImagePreviewUrl: (filePath: string) => Promise<{ previewUrl?: string; error?: string }>;
+  probeSourcePreview: (input: { filePath: string }) => Promise<Record<string, unknown> & { error?: string }>;
+  prepareSourceEx: (input: { filePath: string }) => Promise<{
+    preparedId: string;
+    inputPath: string;
+    sourceUrl: string;
+    durationSeconds: number | null;
+    error?: string;
+  }>;
+  clipSegmentEx: (args: {
+    preparedId: string;
+    partNumber: number | string;
+    segmentIndex: number;
+    startMs: number;
+    endMs: number;
+    inputPath?: string;
+  }) => Promise<{ outputPath: string; segmentUrl: string; durationSeconds: number }>;
+  mergeSegmentWithVoice: (args: {
+    preparedId: string;
+    partNumber: number | string;
+    segmentIndex: number;
+    segmentPath: string;
+    voicePath: string;
+    inputPath: string;
+    startMs: number;
+  }) => Promise<{ outputPath: string; outputUrl: string }>;
+  burnSubtitles: (args: {
+    preparedId: string;
+    partNumber: number | string;
+    segmentIndex: number;
+    mergedVideoPath: string;
+    voiceAudioPath: string;
+    text: string;
+    marginV?: number;
+    fontSize?: number;
+    fontColor?: string;
+    bold?: boolean;
+    outlineEnabled?: boolean;
+    outlineSize?: number;
+    outlineColor?: string;
+  }) => Promise<{ outputPath: string; url: string; srtPath: string }>;
+  getMediaDurationSeconds: (filePath: string) => Promise<{ durationSeconds: number }>;
+  extractAudioToWav: (inputPath: string) => Promise<{ outputPath: string }>;
+  compressVideoForUpload: (args: {
+    inputPath: string;
+    width: number;
+    height: number;
+    fps: number;
+    bitrateKbps: number;
+  }) => Promise<{ outputPath: string }>;
+  changeAudioSpeed: (args: { inputPath: string; speed: number; outputPath: string }) => Promise<{ success: boolean; outputPath?: string; error?: string }>;
+  composePartVideoEx: (args: {
+    preparedId: string;
+    partNumber: number | string;
+    segments: Array<{ videoPath: string; type: 'commentary' | 'original_clip'; removeBackgroundAudio?: boolean }>;
+    backgroundMusicPath?: string;
+    backgroundMusicVolume?: number;
+    originalClipVolume?: number;
+    vocalIsolationMix?: number;
+    watermarkText?: string;
+    watermarkOpacity?: number;
+    watermarkFontSize?: number;
+    forcedAspectRatio?: string;
+    videoBitrateKbps?: number;
+  }) => Promise<{ outputPath: string; finalUrl: string }>;
+  composeProgressStatus: () => Promise<{
+    active: boolean;
+    status: string;
+    step?: string;
+    processed?: number;
+    total?: number;
+    partNumber?: number;
+    detail?: string;
+    ratio?: number;
+  }>;
+  composeProgressCancel: () => Promise<{ ok: boolean }>;
+  composeCoverVideo: (args: {
+    inputPath: string;
+    coverImagePath?: string;
+    coverDurationSec?: number;
+    forcePortrait?: boolean;
+    videoBitrateKbps?: number;
+    texts: Array<Record<string, unknown> & { text: string }>;
+  }) => Promise<{ outputPath: string; finalUrl: string }>;
+  composeAdVideo: (args: {
+    inputPath: string;
+    adVideoPath: string;
+    adAudioPath: string;
+    insertionTimeSec: number;
+    videoBitrateKbps?: number;
+  }) => Promise<{ outputPath: string; finalUrl: string }>;
+  previewVocalIsolation: (args: { inputVideoPath: string; vocalIsolationMix: number }) => Promise<{ previewUrl: string }>;
+  exportPartVideo: (payload: { outputPath: string; defaultFileName?: string }) => Promise<{ canceled: boolean; outputPath?: string }>;
+  exportAllVideos: (payload: { items: Array<{ outputPath: string; fileName: string }> }) => Promise<{ canceled: boolean; dir?: string }>;
+  adVideosList: () => Promise<{ items: Array<{ id: string; name: string; description: string; filePath: string; previewUrl: string }> }>;
+  adVideosAdd: (payload: { name: string; description: string; filePath: string }) => Promise<{ ok: boolean; id?: string }>;
+  adVideosUpdate: (payload: { id: string; name: string; description: string }) => Promise<{ ok: boolean }>;
+  adVideosDelete: (id: string) => Promise<{ ok: boolean }>;
+  listCustomFonts: () => Promise<{ items: Array<{ id: string; alias: string; filePath: string; previewUrl: string }> }>;
+  generateVoice: (args: {
+    preparedId: string;
+    partNumber: number | string;
+    segmentIndex: number;
+    text: string;
+    voiceId?: string;
+    speed?: number;
+  }) => Promise<{ outputPath: string; audioUrl: string }>;
+  uploadCommentaryMedia: (filePath: string) => Promise<{ url: string; error?: string }>;
+  resolveLocalMedia: (token: string) => Promise<{ absPath: string }>;
+  saveCommentaryFile: (payload: { relPath: string; content: string }) => Promise<{ success: boolean; absPath?: string; error?: string }>;
 }
 
 // 引入用于类型声明

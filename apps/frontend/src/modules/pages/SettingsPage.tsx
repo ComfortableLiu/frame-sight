@@ -19,7 +19,7 @@ export function SettingsPage(): JSX.Element {
   const { back } = useRouter();
   const modelConfig = useSelector(selectModelConfig);
   const agentChatModelId = useSelector(selectAgentChatModelId);
-  const [tab, setTab] = useState<'model' | 'analysis' | 'storage' | 'voice'>('model');
+  const [tab, setTab] = useState<'model' | 'analysis' | 'storage' | 'voice' | 'advideo'>('model');
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -98,6 +98,13 @@ export function SettingsPage(): JSX.Element {
             <span className="nav-icon">🎙️</span>
             语音设置
           </button>
+          <button
+            className={`settings-nav-item ${tab === 'advideo' ? 'active' : ''}`}
+            onClick={() => setTab('advideo')}
+          >
+            <span className="nav-icon">📺</span>
+            广告视频
+          </button>
         </nav>
 
         <div className="settings-body">
@@ -156,6 +163,8 @@ export function SettingsPage(): JSX.Element {
             />
           ) : tab === 'storage' ? (
             <StorageTab />
+          ) : tab === 'advideo' ? (
+            <AdVideoTab />
           ) : (
             <VoiceTab />
           )}
@@ -642,6 +651,103 @@ function VoiceTab(): JSX.Element {
         <button className="btn btn-primary" onClick={save}>保存语音设置</button>
       </div>
       {saved && <div className="current-model" style={{ marginTop: 8 }}>{saved}</div>}
+    </>
+  );
+}
+
+/* ── 广告视频管理（解说模式 Step7 素材库） ────────── */
+
+function AdVideoTab(): JSX.Element {
+  const [items, setItems] = useState<Array<{ id: string; name: string; description: string; filePath: string; previewUrl: string }>>([]);
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [filePath, setFilePath] = useState('');
+  const [msg, setMsg] = useState('');
+
+  const refresh = async () => {
+    try {
+      const res = await window.viewPoint.adVideosList();
+      setItems(res.items || []);
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  useEffect(() => {
+    void refresh();
+  }, []);
+
+  return (
+    <>
+      <div className="section">
+        <h4>广告视频管理</h4>
+        <p className="muted-text">管理广告视频素材，LLM 分析时使用您设置的名称和简介。</p>
+        <label className="form-label">名称</label>
+        <input className="form-field" value={name} onChange={(e) => setName(e.target.value)} placeholder="广告名称" />
+        <label className="form-label">简介</label>
+        <textarea className="form-field" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="广告内容简介，供 LLM 匹配" />
+        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+          <button
+            className="btn"
+            onClick={async () => {
+              const res = await window.viewPoint.pickVideoFile();
+              if (res.canceled || !res.filePath) return;
+              setFilePath(res.filePath);
+              if (!name) {
+                const base = res.filePath.split(/[\\/]/).pop() || '';
+                setName(base.replace(/\.[^.]+$/, ''));
+              }
+            }}
+          >
+            选择视频文件
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={async () => {
+              if (!name.trim() || !filePath) {
+                setMsg('请填写名称并选择视频');
+                return;
+              }
+              await window.viewPoint.adVideosAdd({ name: name.trim(), description, filePath });
+              setName('');
+              setDescription('');
+              setFilePath('');
+              setMsg('添加成功');
+              await refresh();
+            }}
+          >
+            添加
+          </button>
+        </div>
+        {filePath ? <div className="muted-text" style={{ marginTop: 6 }}>{filePath}</div> : null}
+        {msg ? <div className="current-model" style={{ marginTop: 8 }}>{msg}</div> : null}
+      </div>
+      <div className="section">
+        <h4>已添加（{items.length}）</h4>
+        {items.length === 0 ? (
+          <div className="muted-text">暂无广告视频，请点击上方按钮添加</div>
+        ) : (
+          items.map((item) => (
+            <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+              <div>
+                <div>{item.name}</div>
+                <div className="muted-text">{item.description || '无简介'}</div>
+                <div className="muted-text" style={{ fontSize: 12 }}>{item.filePath}</div>
+              </div>
+              <button
+                className="btn"
+                onClick={async () => {
+                  if (!confirm('删除后将无法恢复，确认删除此广告视频？')) return;
+                  await window.viewPoint.adVideosDelete(item.id);
+                  await refresh();
+                }}
+              >
+                删除
+              </button>
+            </div>
+          ))
+        )}
+      </div>
     </>
   );
 }
