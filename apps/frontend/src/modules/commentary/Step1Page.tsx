@@ -27,7 +27,7 @@ import {
   setQuickGenerate,
   setScript,
 } from '../../store/commentarySlice.js';
-import { selectModelConfig, selectModelConfigLoaded } from '../../store/modelConfigSlice.js';
+import { selectModelConfig, selectModelConfigLoaded, setModelConfig } from '../../store/modelConfigSlice.js';
 import { store } from '../../store/index.js';
 import { generateCommentaryScript } from './commentaryUtils.js';
 import { getPartSegmentEntries, normalizeSegmentComposeKind, segmentKey, voiceKey, getSegmentTimeRange } from '../../types/script.js';
@@ -55,6 +55,23 @@ export function Step1Page(): JSX.Element {
   const [genLoading, setGenLoading] = useState(false);
   const [abortRef] = useState<{ current: AbortController | null }>({ current: null });
   const options = useMemo(() => modelOptions(modelConfig), [modelConfig]);
+
+  // 若布局未加载成功，本页再兜底拉取一次
+  useEffect(() => {
+    if (modelConfigLoaded) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const config = await window.viewPoint.getModelConfig();
+        if (!cancelled && config?.platforms) dispatch(setModelConfig(config));
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [modelConfigLoaded, dispatch]);
 
   const ensurePrepared = useCallback(async () => {
     if (!c.localVideoPath) throw new Error('请先选择视频');
@@ -457,7 +474,18 @@ export function Step1Page(): JSX.Element {
                       allowClear
                       showSearch
                       style={{ minWidth: 280 }}
-                      placeholder={modelConfigLoaded ? '选择模型' : '加载中…'}
+                      placeholder={
+                        !modelConfigLoaded
+                          ? '加载中…'
+                          : options.length
+                            ? '选择模型'
+                            : '暂无模型，请先在设置中配置平台'
+                      }
+                      notFoundContent={
+                        modelConfigLoaded && !options.length
+                          ? '暂无模型，请先在设置 → 模型配置'
+                          : undefined
+                      }
                       options={options}
                       value={c.llmModels[key] || undefined}
                       onChange={(v) => dispatch(setLlmModel({ key, value: v || '' }))}

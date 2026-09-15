@@ -8,6 +8,7 @@ import {
   setCurrentStep,
   setFlowMode,
 } from '../../store/commentarySlice.js';
+import { selectModelConfigLoaded, setModelConfig } from '../../store/modelConfigSlice.js';
 import { useRouter, stepToRoute, routeToStep } from '../router/Router.js';
 import { useTheme } from '../../hooks/useTheme.js';
 import { Step1Page } from './Step1Page.js';
@@ -57,7 +58,25 @@ export function CommentaryLayout(): JSX.Element {
   const currentStep = useSelector(selectCurrentStep);
   const maxAllowed = useSelector(selectMaxAllowedStep);
   const flowMode = useSelector(selectFlowMode);
+  const modelConfigLoaded = useSelector(selectModelConfigLoaded);
   const { replace, route } = useRouter();
+
+  // 进入解说模式时加载模型配置（设置页/Agent 页可能尚未加载）
+  useEffect(() => {
+    if (modelConfigLoaded) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const config = await window.viewPoint.getModelConfig();
+        if (!cancelled && config?.platforms) dispatch(setModelConfig(config));
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [modelConfigLoaded, dispatch]);
 
   // 路由 → 状态同步
   useEffect(() => {
