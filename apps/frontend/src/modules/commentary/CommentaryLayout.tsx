@@ -121,9 +121,19 @@ export function CommentaryLayout(): JSX.Element {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg-base)', color: 'var(--text-primary)' }}>
+    <div
+      style={{
+        height: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        background: 'var(--bg-base)',
+        color: 'var(--text-primary)',
+      }}
+    >
       <div
         style={{
+          flexShrink: 0,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -154,7 +164,7 @@ export function CommentaryLayout(): JSX.Element {
           <Typography.Text type="secondary">模式：{flowMode === 'normal' ? '解说' : 'Agent'}</Typography.Text>
         </Space>
       </div>
-      <div style={{ padding: '12px 20px 0' }}>
+      <div style={{ flexShrink: 0, padding: '12px 20px 0' }}>
         <Steps
           size="small"
           current={currentStep - 1}
@@ -165,7 +175,17 @@ export function CommentaryLayout(): JSX.Element {
           }))}
         />
       </div>
-      <div style={{ padding: 16 }}>{renderStep()}</div>
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          padding: 16,
+        }}
+      >
+        {renderStep()}
+      </div>
     </div>
   );
 }
