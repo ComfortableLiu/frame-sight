@@ -213,7 +213,7 @@ export const DEFAULT_COMPOSE_AUDIO: ComposeAudioSettings = {
 };
 
 const initialState: CommentaryState = {
-  flowMode: 'normal',
+  flowMode: 'agent',
   localVideoPath: '',
   preparedId: '',
   inputPath: '',

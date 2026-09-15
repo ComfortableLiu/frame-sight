@@ -111,6 +111,9 @@ export function Step7Page(): JSX.Element {
       if (!ep?.apiKey) throw new Error('未配置第七步广告模型');
 
       const prompt = buildStep7AdPrompt(adVideos.map((a) => ({ name: a.name, description: a.description })));
+      const srtBlock = c.step1SrtText?.trim()
+        ? `\n\nASR/字幕文稿（请结合时间戳定位插入点）：\n${c.step1SrtText.trim().slice(0, 12000)}`
+        : '';
       const { text } = await streamChatCompletion({
         apiBase: ep.apiBase,
         apiKey: ep.apiKey,
@@ -121,7 +124,7 @@ export function Step7Page(): JSX.Element {
             role: 'user',
             content: [
               { type: 'video_url', video_url: { url: up.url } },
-              { type: 'text', text: prompt },
+              { type: 'text', text: prompt + srtBlock },
             ],
           },
         ],

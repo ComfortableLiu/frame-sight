@@ -652,7 +652,7 @@ export function AgentPage(): JSX.Element {
             }}
             title="进入影视剧解说七步工作流"
           >
-            🎬 解说模式
+            影视解说
           </button>
           <button className="btn" onClick={() => pushRoute('settings')}>
             ⚙ 设置

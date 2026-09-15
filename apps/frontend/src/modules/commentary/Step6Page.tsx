@@ -57,6 +57,16 @@ export function Step6Page(): JSX.Element {
     () => fonts.map((f) => ({ label: f.alias, value: f.id })),
     [fonts],
   );
+  const fontOptionMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const f of fonts) m.set(f.id, f.alias);
+    return m;
+  }, [fonts]);
+  const fontPathById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const f of fonts) m.set(f.id, f.filePath);
+    return m;
+  }, [fonts]);
 
   const applyConfig = (patch: Partial<typeof config>) => {
     dispatch(setStep6Config({ partNumber: 1, patch }));
@@ -95,7 +105,11 @@ export function Step6Page(): JSX.Element {
         coverImagePath: config.coverImagePath || undefined,
         forcePortrait,
         videoBitrateKbps: c.composeAudioSettings.finalVideoBitrateKbps,
-        texts: config.texts.map((t) => ({ ...t, text: t.text.replace(/\s+/g, ' ').trim() })),
+        texts: config.texts.map((t) => ({
+          ...t,
+          text: t.text.replace(/\s+/g, ' ').trim(),
+          fontFamily: fontPathById.get(t.fontFamily) || t.fontFamily,
+        })),
       });
       dispatch(setStep6Output({ partNumber: 1, outputPath: res.outputPath, finalUrl: res.finalUrl }));
       message.success('第六步合成完成');
@@ -166,6 +180,35 @@ export function Step6Page(): JSX.Element {
               <div
                 key={t.id}
                 onClick={() => setSelectedId(t.id)}
+                onPointerDown={(e) => {
+                  setSelectedId(t.id);
+                  const target = e.currentTarget;
+                  const parent = target.parentElement;
+                  if (!parent) return;
+                  const parentRect = parent.getBoundingClientRect();
+                  const rect = target.getBoundingClientRect();
+                  const offsetX = e.clientX - rect.left;
+                  const offsetY = e.clientY - rect.top;
+                  target.setPointerCapture(e.pointerId);
+                  const onMove = (ev: PointerEvent) => {
+                    const x = ev.clientX - parentRect.left - offsetX;
+                    const y = ev.clientY - parentRect.top - offsetY;
+                    const xPercent = Math.min(100, Math.max(0, (x / Math.max(1, parentRect.width - rect.width)) * 100));
+                    const yPercent = Math.min(100, Math.max(0, (y / Math.max(1, parentRect.height - rect.height)) * 100));
+                    applyConfig({
+                      texts: config.texts.map((item) =>
+                        item.id === t.id ? { ...item, xPercent, yPercent } : item,
+                      ),
+                    });
+                  };
+                  const onUp = () => {
+                    target.releasePointerCapture(e.pointerId);
+                    window.removeEventListener('pointermove', onMove);
+                    window.removeEventListener('pointerup', onUp);
+                  };
+                  window.addEventListener('pointermove', onMove);
+                  window.addEventListener('pointerup', onUp);
+                }}
                 style={{
                   position: 'absolute',
                   left: `${t.xPercent}%`,
@@ -178,8 +221,9 @@ export function Step6Page(): JSX.Element {
                   whiteSpace: 'nowrap',
                   outline: selectedId === t.id ? '1px dashed #fff' : undefined,
                   outlineOffset: 4,
-                  cursor: 'pointer',
-                  fontFamily: '"PingFang SC","Microsoft YaHei",sans-serif',
+                  cursor: 'move',
+                  userSelect: 'none',
+                  fontFamily: fontOptionMap.get(t.fontFamily) || '"PingFang SC","Microsoft YaHei",sans-serif',
                 }}
               >
                 {t.text}

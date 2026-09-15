@@ -6,6 +6,7 @@ import {
   segmentKey,
   voiceKey,
   tryParseScriptParts,
+  tryNormalizeScriptJsonTimestamps,
   extractJsonFromLlmText,
   parseTimeToMs,
   msToHmsMs,
@@ -151,6 +152,7 @@ async function callModelTextContinuation(opts: {
   let accumulated = '';
   for (let round = 0; round < SCRIPT_MAX_CONTINUATION_ROUNDS; round++) {
     if (opts.signal?.aborted) throw new Error('cancelled');
+    const before = accumulated;
     const { text, finishReason } = await streamChatCompletion({
       apiBase: opts.apiBase,
       apiKey: opts.apiKey,
@@ -159,17 +161,12 @@ async function callModelTextContinuation(opts: {
       maxTokens: SCRIPT_MAX_TOKENS_PER_ROUND,
       enableThinking: opts.enableThinking,
       signal: opts.signal,
-      onDelta: (full) => opts.onDelta?.(full),
+      onDelta: (roundFull) => opts.onDelta?.(before + roundFull),
     });
     if (finishReason === 'content_filter' || finishReason === 'safety') {
       throw new Error('模型因安全策略未输出完整内容，请调整需求后重试');
     }
-    accumulated = accumulated ? accumulated + text : text;
-    // streamChat onDelta already sends cumulative of this round; fix: accumulate manually
-    // We recompute: first round text is full; later rounds we need append
-    if (round > 0) {
-      // text is only this round piece; already appended
-    }
+    accumulated = before + text;
     const truncated =
       finishReason === 'length' ||
       finishReason === 'max_tokens' ||
@@ -351,7 +348,10 @@ export async function generateCommentaryScript(deps: GenerateScriptDeps): Promis
       const wav = await window.viewPoint.extractAudioToWav(inputPath);
       const audioUp = await window.viewPoint.uploadCommentaryMedia(wav.outputPath);
       let srtText = '';
-      if (audioUp.url) {
+      if (!audioUp.url) {
+        throw new Error(audioUp.error || '音频上传失败，无法生成 SRT');
+      }
+      {
         const srtEp = resolveEndpoint(state.llmModels.step1SrtModel || state.llmModels.step1StructuredReportModel, modelConfig);
         const srtRaw = await streamChatCompletion({
           apiBase: srtEp.apiBase,
@@ -380,22 +380,93 @@ export async function generateCommentaryScript(deps: GenerateScriptDeps): Promis
         modelConfig,
       );
       const reportPrompt = buildStructuredReportPromptText(state.localVideoDurationSeconds);
-      const report = await callChatCompletionNonStream({
-        apiBase: reportEp.apiBase,
-        apiKey: reportEp.apiKey,
-        model: reportEp.modelName,
-        maxTokens: STRUCTURED_REPORT_MAX_TOKENS,
-        signal,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'video_url', video_url: { url: videoUrl } },
-              { type: 'text', text: reportPrompt },
-            ],
-          },
-        ],
-      });
+
+      const requestReportForUrl = async (url: string, durationSec: number) =>
+        callChatCompletionNonStream({
+          apiBase: reportEp.apiBase,
+          apiKey: reportEp.apiKey,
+          model: reportEp.modelName,
+          maxTokens: STRUCTURED_REPORT_MAX_TOKENS,
+          signal,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'video_url', video_url: { url } },
+                {
+                  type: 'text',
+                  text: buildStructuredReportPromptText(durationSec),
+                },
+              ],
+            },
+          ],
+        });
+
+      let report = '';
+      const totalSec = state.localVideoDurationSeconds || 0;
+      if (totalSec > 600 && state.preparedId) {
+        // 超过 600s：按 600 秒切分上传后并行拉片再合并
+        const CHUNK = 600;
+        const chunkCount = Math.ceil(totalSec / CHUNK);
+        const chunkUrls: Array<{ url: string; startSec: number; endSec: number }> = [];
+        for (let i = 0; i < chunkCount; i++) {
+          const startMs = i * CHUNK * 1000;
+          const endMs = Math.min(totalSec * 1000, (i + 1) * CHUNK * 1000);
+          const clipped = await window.viewPoint.clipSegmentEx({
+            preparedId: state.preparedId,
+            partNumber: 0,
+            segmentIndex: i,
+            startMs,
+            endMs,
+            inputPath,
+          });
+          let clipUploadPath = clipped.outputPath;
+          if (state.compressForUploadEnabled) {
+            const compressed = await window.viewPoint.compressVideoForUpload({
+              inputPath: clipped.outputPath,
+              width: 640,
+              height: 360,
+              fps: state.compressFps,
+              bitrateKbps: state.compressBitrateKbps,
+            });
+            clipUploadPath = compressed.outputPath;
+          }
+          const cu = await window.viewPoint.uploadCommentaryMedia(clipUploadPath);
+          if (!cu.url) throw new Error(cu.error || `第 ${i + 1} 段上传失败`);
+          chunkUrls.push({
+            url: cu.url,
+            startSec: i * CHUNK,
+            endSec: Math.min(totalSec, (i + 1) * CHUNK),
+          });
+        }
+        const chunkReports: string[] = new Array(chunkUrls.length);
+        await mapLimit(chunkUrls, 2, async (chunk, idx) => {
+          st.dispatch(
+            setScriptGenerating({
+              running: true,
+              progress: `结构化报告 分段 ${idx + 1}/${chunkUrls.length}…`,
+            }),
+          );
+          chunkReports[idx] = await requestReportForUrl(
+            chunk.url,
+            chunk.endSec - chunk.startSec,
+          );
+        });
+        // 合并：保留表头一次，后续段跳过表头行
+        const mergedLines: string[] = [];
+        chunkReports.forEach((r, idx) => {
+          const lines = r.split(/\r?\n/).filter((l) => l.trim());
+          if (idx === 0) {
+            mergedLines.push(...lines);
+          } else {
+            const body = lines.filter((l) => !/^时间段\|/.test(l.trim()));
+            mergedLines.push(...body);
+          }
+        });
+        report = mergedLines.join('\n');
+      } else {
+        report = await requestReportForUrl(videoUrl, totalSec);
+      }
       if (!report.trim()) throw new Error('结构化报告为空');
       st.dispatch(setStructuredReport({ report: report.trim(), sourceLink: identity }));
     }
@@ -432,12 +503,13 @@ export async function generateCommentaryScript(deps: GenerateScriptDeps): Promis
         try {
           const arr = JSON.parse(extractJsonFromLlmText(raw));
           const first = Array.isArray(arr) ? arr[0] : null;
-          if (first?.video_timestamp?.start && first.video_timestamp.start !== '00:00:00.000') {
+          const start = first?.video_timestamp?.start;
+          if (Array.isArray(arr) && arr.length && start && start !== '00:00:00.000') {
             return raw;
           }
-          if (Array.isArray(arr) && arr.length) return raw;
+          // 零起点或无法解析：带后缀重试
         } catch {
-          return raw;
+          // 解析失败也重试
         }
         prompt =
           buildGoldenHookPromptText(report, voiceSpeed, srtText) +
@@ -570,6 +642,7 @@ export async function generateCommentaryScript(deps: GenerateScriptDeps): Promis
       }
     }
 
+    parts = tryNormalizeScriptJsonTimestamps(parts);
     st.dispatch(setScript(parts));
     st.dispatch(setStreamingScriptText(''));
     st.dispatch(setCurrentStep(2));

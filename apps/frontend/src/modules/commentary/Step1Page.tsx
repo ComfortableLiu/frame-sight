@@ -30,7 +30,7 @@ import {
 import { selectModelConfig, selectModelConfigLoaded } from '../../store/modelConfigSlice.js';
 import { store } from '../../store/index.js';
 import { generateCommentaryScript } from './commentaryUtils.js';
-import { getPartSegmentEntries, normalizeSegmentComposeKind, segmentKey, voiceKey } from '../../types/script.js';
+import { getPartSegmentEntries, normalizeSegmentComposeKind, segmentKey, voiceKey, getSegmentTimeRange } from '../../types/script.js';
 import { runWithConcurrency } from './commentaryUtils.js';
 import { setCurrentStep } from '../../store/commentarySlice.js';
 
@@ -167,12 +167,8 @@ export function Step1Page(): JSX.Element {
         const pn = Number(part.part_number);
         getPartSegmentEntries(part).forEach((s, idx) => {
           const kind = normalizeSegmentComposeKind(s.type, s);
-          const range = getPartSegmentEntries.length ? (s as { video_timestamp?: { start: string; end: string } }) : null;
-          const vt = s.video_timestamp;
-          const startMs = vt ? parseMs(vt.start) : 0;
-          const endMs = vt ? parseMs(vt.end) : 0;
-          jobs.push({ partNumber: pn, segmentIndex: idx, startMs, endMs, kind, voiceover: s.voiceover });
-          void range;
+          const range = getSegmentTimeRange(s);
+          jobs.push({ partNumber: pn, segmentIndex: idx, startMs: range.startMs, endMs: range.endMs, kind, voiceover: s.voiceover });
         });
       }
 
@@ -496,15 +492,4 @@ export function Step1Page(): JSX.Element {
       ) : null}
     </Space>
   );
-}
-
-function parseMs(v: string): number {
-  const m = String(v || '').match(/^(\d+):(\d+)(?::(\d+))?(?:\.(\d{1,3}))?$/);
-  if (!m) return 0;
-  const a = parseInt(m[1], 10) || 0;
-  const b = parseInt(m[2], 10) || 0;
-  const c = m[3] != null ? parseInt(m[3], 10) || 0 : 0;
-  const frac = m[4] ? parseInt(m[4].padEnd(3, '0'), 10) : 0;
-  if (m[3] != null) return a * 3600000 + b * 60000 + c * 1000 + frac;
-  return a * 60000 + b * 1000 + frac;
 }

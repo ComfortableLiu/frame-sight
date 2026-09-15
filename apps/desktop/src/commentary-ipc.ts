@@ -18,6 +18,25 @@ function joinUrl(base: string, suffix: string): string {
   return base + suffix;
 }
 
+/** 校验路径段：禁止 ..、绝对路径、空段。 */
+function isSafePathSegment(seg: string): boolean {
+  if (!seg || typeof seg !== 'string') return false;
+  if (seg.includes('..') || seg.includes('\0')) return false;
+  if (path.isAbsolute(seg)) return false;
+  if (/^[a-zA-Z]:/.test(seg)) return false;
+  return true;
+}
+
+function safeJoinUnder(root: string, ...parts: string[]): string | null {
+  for (const p of parts) {
+    if (!isSafePathSegment(p)) return null;
+  }
+  const abs = path.resolve(root, ...parts);
+  const rootResolved = path.resolve(root);
+  if (abs !== rootResolved && !abs.startsWith(rootResolved + path.sep)) return null;
+  return abs;
+}
+
 function arrayBufferToBase64(buf: ArrayBuffer): string {
   const bytes = new Uint8Array(buf);
   let binary = '';
@@ -130,7 +149,12 @@ export function registerCommentaryIpcHandlers(mediaRoot: string): void {
   });
 
   // ── 裁剪 / 合并 / 字幕 ──
-  ipcMain.handle('vp:clip-segment', (_e, args) => service.clipSegment(args));
+  ipcMain.handle('vp:clip-segment', (_e, args: { preparedId: string; partNumber: number | string; segmentIndex: number; startMs: number; endMs: number; inputPath?: string }) => {
+    if (!isSafePathSegment(String(args.preparedId || ''))) {
+      return Promise.reject(new Error('非法 preparedId'));
+    }
+    return service.clipSegment(args);
+  });
   ipcMain.handle('vp:merge-segment-with-voice', (_e, args) => service.mergeSegmentWithVoice(args));
   ipcMain.handle('vp:burn-subtitles', (_e, args) => service.burnSubtitles(args));
   ipcMain.handle('vp:get-media-duration-seconds', (_e, filePath: string) =>
@@ -178,7 +202,10 @@ export function registerCommentaryIpcHandlers(mediaRoot: string): void {
     const dir = res.filePaths[0];
     for (const item of payload.items || []) {
       if (!item?.outputPath || !fs.existsSync(item.outputPath)) continue;
-      await service.exportCopy(item.outputPath, path.join(dir, item.fileName || path.basename(item.outputPath)));
+      const safeName = path.basename(item.fileName || path.basename(item.outputPath)).replace(/[\\/:*?"<>|]/g, '_');
+      const dest = safeJoinUnder(dir, safeName);
+      if (!dest) continue;
+      await service.exportCopy(item.outputPath, dest);
     }
     return { canceled: false, dir };
   });
@@ -311,7 +338,12 @@ export function registerCommentaryIpcHandlers(mediaRoot: string): void {
     const base64 = await extractAudioBase64(res);
     if (!base64) throw new Error('语音合成为空结果');
 
-    const dir = path.join(mediaRoot, 'voices', args.preparedId || 'default', `part_${String(args.partNumber).padStart(3, '0')}`);
+    const dir = path.join(
+      mediaRoot,
+      'voices',
+      isSafePathSegment(args.preparedId || 'default') ? args.preparedId : 'default',
+      `part_${String(args.partNumber).padStart(3, '0').replace(/\D/g, '0')}`,
+    );
     fs.mkdirSync(dir, { recursive: true });
     const seg = String(args.segmentIndex).padStart(3, '0');
     const ext = format === 'pcm' ? 'pcm' : format;
@@ -355,7 +387,8 @@ export function registerCommentaryIpcHandlers(mediaRoot: string): void {
   // 保存本地文件并注册
   ipcMain.handle('vp:save-commentary-file', (_e, payload: { relPath: string; content: string }) => {
     try {
-      const abs = path.join(mediaRoot, 'commentary', payload.relPath);
+      const abs = safeJoinUnder(path.join(mediaRoot, 'commentary'), payload.relPath);
+      if (!abs) return { success: false, error: '非法相对路径' };
       fs.mkdirSync(path.dirname(abs), { recursive: true });
       fs.writeFileSync(abs, payload.content, 'utf8');
       return { success: true, absPath: abs };

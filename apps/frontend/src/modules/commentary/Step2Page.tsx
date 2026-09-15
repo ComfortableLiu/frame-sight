@@ -226,24 +226,44 @@ export function Step2Page(): JSX.Element {
             </Space>
             {c.segments[tune.key]?.segmentUrl ? (
               <video
+                className="tune-video"
                 src={c.segments[tune.key].segmentUrl}
                 controls
                 style={{ width: '100%', maxHeight: 240, background: '#000' }}
-                onTimeUpdate={(e) => {
-                  const v = e.currentTarget;
-                  void v;
-                }}
               />
             ) : null}
-            <Button
-              size="small"
-              onClick={() => {
-                const v = document.querySelector<HTMLVideoElement>('.tune-video');
-                if (v) setTune({ ...tune, startMs: Math.floor(v.currentTime * 1000) });
-              }}
-            >
-              用当前帧设为开始
-            </Button>
+            <Space wrap>
+              <Button
+                size="small"
+                onClick={() => {
+                  const v = document.querySelector<HTMLVideoElement>('.tune-video');
+                  if (v) setTune({ ...tune, startMs: Math.floor(v.currentTime * 1000) });
+                }}
+              >
+                用当前帧设为开始
+              </Button>
+              <Button
+                size="small"
+                onClick={() => {
+                  const v = document.querySelector<HTMLVideoElement>('.tune-video');
+                  if (v) setTune({ ...tune, endMs: Math.floor(v.currentTime * 1000) });
+                }}
+              >
+                用当前帧设为结束
+              </Button>
+              <Button
+                size="small"
+                onClick={() => {
+                  const v = document.querySelector<HTMLVideoElement>('.tune-video');
+                  if (v) {
+                    v.currentTime = tune.startMs / 1000;
+                    void v.play();
+                  }
+                }}
+              >
+                从开始点播放
+              </Button>
+            </Space>
           </Space>
         ) : null}
       </Modal>

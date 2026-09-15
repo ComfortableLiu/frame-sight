@@ -772,10 +772,13 @@ export class CommentaryVideoService {
 
     const tmpRoot = this.abs('tmp', `compose_${Date.now()}`);
     fs.mkdirSync(tmpRoot, { recursive: true });
+    const throwIfAborted = () => {
+      if (this.composeAbort?.signal.aborted) throw new Error('cancelled');
+    };
     try {
       const prepared: string[] = [];
       for (let i = 0; i < args.segments.length; i++) {
-        if (this.composeAbort.signal.aborted) throw new Error('cancelled');
+        throwIfAborted();
         const seg = args.segments[i];
         this.setProgress({ step: '预处理片段', processed: i, ratio: 0.05 + (i / args.segments.length) * 0.35 });
         let p = seg.videoPath;
@@ -808,21 +811,25 @@ export class CommentaryVideoService {
       // 强制画幅
       let ratioApplied = prepared;
       if (args.forcedAspectRatio && args.forcedAspectRatio !== 'source') {
+        throwIfAborted();
         this.setProgress({ step: '强制画幅', ratio: 0.5 });
         ratioApplied = [];
         for (let i = 0; i < prepared.length; i++) {
+          throwIfAborted();
           const out = path.join(tmpRoot, `ratio_${i}.mp4`);
           await this.cropToAspectRatio(prepared[i], out, args.forcedAspectRatio);
           ratioApplied.push(fs.existsSync(out) ? out : prepared[i]);
         }
       }
 
+      throwIfAborted();
       this.setProgress({ step: '拼接', ratio: 0.65 });
       const concatPath = path.join(tmpRoot, 'concat.mp4');
       await this.concatVideos(ratioApplied, concatPath);
 
       let current = concatPath;
       if (args.backgroundMusicPath) {
+        throwIfAborted();
         this.setProgress({ step: '混入背景音乐', ratio: 0.75 });
         const bgmOut = path.join(tmpRoot, 'bgm.mp4');
         await this.mixBackgroundMusic({
@@ -834,6 +841,7 @@ export class CommentaryVideoService {
         current = bgmOut;
       }
       if (args.watermarkText && args.watermarkText.trim()) {
+        throwIfAborted();
         this.setProgress({ step: '水印', ratio: 0.85 });
         const wmOut = path.join(tmpRoot, 'wm.mp4');
         await this.applyMovingWatermark({
@@ -846,6 +854,7 @@ export class CommentaryVideoService {
         current = wmOut;
       }
 
+      throwIfAborted();
       this.setProgress({ step: '码率转码', ratio: 0.92 });
       const dir = this.abs('final', args.preparedId);
       fs.mkdirSync(dir, { recursive: true });
@@ -943,7 +952,9 @@ export class CommentaryVideoService {
       const xp = clamp(t.xPercent ?? 50, 0, 100) / 100;
       const yp = clamp(t.yPercent ?? 50, 0, 100) / 100;
       const escaped = text.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/:/g, '\\:');
-      const fontEsc = font.replace(/\\/g, '/').replace(/:/g, '\\:');
+      const fontFile =
+        t.fontFamily && fs.existsSync(t.fontFamily) ? t.fontFamily : font;
+      const fontEsc = fontFile.replace(/\\/g, '/').replace(/:/g, '\\:');
       const xExpr = `((w-text_w-${outlineWidth * 2})*${xp.toFixed(4)}+${outlineWidth})`;
       const yExpr = `((h-text_h-${outlineWidth * 2})*${yp.toFixed(4)}+${outlineWidth})`;
       const shadow = t.bold ? ':shadowcolor=black@0.6:shadowx=1:shadowy=1' : '';
@@ -1006,7 +1017,7 @@ export class CommentaryVideoService {
       `[0:v]trim=start=${insertion.toFixed(3)},setpts=PTS-STARTPTS[v_post]`,
       `[0:v]trim=start=${insertion.toFixed(3)}:end=${(insertion + 0.04).toFixed(3)},setpts=PTS-STARTPTS[v_freeze_src]`,
       `[v_freeze_src]tpad=stop_mode=clone:stop_duration=${adAudioDur.toFixed(3)}[v_bg]`,
-      `[1:v]trim=duration=${adAudioDur.toFixed(3)},setpts=PTS-STARTPTS[v_ad]`,
+      `[1:v]setpts=PTS-STARTPTS,tpad=stop_mode=clone:stop_duration=${adAudioDur.toFixed(3)},trim=duration=${adAudioDur.toFixed(3)}[v_ad]`,
       `[v_bg][v_ad]overlay=(W-w)/2:(H-h)/2:shortest=1[v_mid]`,
       `[v_pre][v_mid][v_post]concat=n=3:v=1:a=0[v_out]`,
       `[0:a]atrim=0:${insertion.toFixed(3)},asetpts=PTS-STARTPTS[a_pre]`,

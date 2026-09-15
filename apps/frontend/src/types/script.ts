@@ -139,8 +139,21 @@ export function getPartSegmentEntries(part: ScriptPart): ScriptSegment[] {
     const out: ScriptSegment[] = [];
     const push = (v: unknown) => {
       if (!v) return;
-      if (Array.isArray(v)) out.push(...(v as ScriptSegment[]));
-      else out.push(v as ScriptSegment);
+      if (Array.isArray(v)) {
+        for (const item of v) {
+          if (item && typeof item === 'object' && 'golden_hook' in (item as object)) {
+            const w = item as { golden_hook?: ScriptSegment[] };
+            if (Array.isArray(w.golden_hook)) out.push(...w.golden_hook);
+          } else {
+            out.push(item as ScriptSegment);
+          }
+        }
+      } else if (typeof v === 'object' && 'golden_hook' in (v as object)) {
+        const w = v as { golden_hook?: ScriptSegment[] };
+        if (Array.isArray(w.golden_hook)) out.push(...w.golden_hook);
+      } else {
+        out.push(v as ScriptSegment);
+      }
     };
     push(part.golden_hook);
     push(part.main_body);
