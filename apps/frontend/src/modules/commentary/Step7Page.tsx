@@ -25,6 +25,7 @@ import { extractJsonFromLlmText, parseTimeToMs } from '../../types/script.js';
 import { streamChatCompletion } from './commentaryUtils.js';
 import { resolveModelChatEndpoint } from '../../utils/modelChatEndpoint.js';
 import { selectModelConfig } from '../../store/modelConfigSlice.js';
+import { resolveEffectiveCommentaryModel } from './modelSlots.js';
 
 const { Text } = Typography;
 
@@ -106,9 +107,13 @@ export function Step7Page(): JSX.Element {
       if (!up.url) throw new Error(up.error || '成片上传失败');
       patch({ llmSourceVideoHttpUrl: up.url });
 
-      const modelRef = c.llmModels.step7AdModel;
+      const modelRef = resolveEffectiveCommentaryModel(
+        'step7AdModel',
+        c.llmModels,
+        modelConfig.analysisModels,
+      );
       const ep = resolveModelChatEndpoint(modelRef, modelConfig);
-      if (!ep?.apiKey) throw new Error('未配置第七步广告模型');
+      if (!ep?.apiKey) throw new Error('未配置第七步广告模型（可在解说 Step1 或设置 → 分析模型中配置）');
 
       const prompt = buildStep7AdPrompt(adVideos.map((a) => ({ name: a.name, description: a.description })));
       const srtBlock = c.step1SrtText?.trim()

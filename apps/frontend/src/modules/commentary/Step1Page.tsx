@@ -30,20 +30,80 @@ import {
 import { selectModelConfig, selectModelConfigLoaded, setModelConfig } from '../../store/modelConfigSlice.js';
 import { store } from '../../store/index.js';
 import { generateCommentaryScript } from './commentaryUtils.js';
+import {
+  COMMENTARY_MODEL_SLOTS,
+  buildCapabilityFilteredOptions,
+  resolveEffectiveCommentaryModel,
+} from './modelSlots.js';
 import { getPartSegmentEntries, normalizeSegmentComposeKind, segmentKey, voiceKey, getSegmentTimeRange } from '../../types/script.js';
 import { runWithConcurrency } from './commentaryUtils.js';
 import { setCurrentStep } from '../../store/commentarySlice.js';
 
 const { Text, Paragraph } = Typography;
 
-function modelOptions(config: ReturnType<typeof selectModelConfig>): Array<{ label: string; value: string }> {
-  const out: Array<{ label: string; value: string }> = [];
-  for (const p of config?.platforms || []) {
-    for (const m of p.selectedModels?.length ? p.selectedModels : p.models || []) {
-      out.push({ label: `${p.name} · ${m}`, value: `${p.name}::${m}` });
-    }
-  }
-  return out;
+function ModelSlotSelect({
+  slot,
+  value,
+  modelConfig,
+  modelConfigLoaded,
+  onChange,
+}: {
+  slot: (typeof COMMENTARY_MODEL_SLOTS)[number];
+  value: string;
+  modelConfig: ReturnType<typeof selectModelConfig>;
+  modelConfigLoaded: boolean;
+  onChange: (v: string) => void;
+}): JSX.Element {
+  const options = useMemo(
+    () => buildCapabilityFilteredOptions(modelConfig, slot.inputCapability),
+    [modelConfig, slot.inputCapability],
+  );
+  const effectiveModel = value
+    ? value
+    : resolveEffectiveCommentaryModel(slot.key, {}, modelConfig.analysisModels);
+  const source = value
+    ? '解说页指定'
+    : modelConfig.analysisModels?.[slot.analysisFallback || 'text']
+      ? `跟随设置 · 分析模型.${slot.analysisFallback}`
+      : '未配置';
+
+  return (
+    <Space style={{ width: '100%' }} align="center" wrap>
+      <Text style={{ width: 100 }} strong>
+        {slot.label}
+      </Text>
+      <Select
+        allowClear
+        showSearch
+        style={{ minWidth: 320 }}
+        placeholder={
+          !modelConfigLoaded
+            ? '加载中…'
+            : effectiveModel
+              ? `默认：${effectiveModel}`
+              : options.length
+                ? '选择模型（留空则用分析模型设置）'
+                : '暂无匹配模型，请在设置中配置能力'
+        }
+        notFoundContent={
+          modelConfigLoaded && !options.length
+            ? '无匹配能力的模型，请到设置 → 模型配置标注能力'
+            : undefined
+        }
+        options={options}
+        value={value || undefined}
+        onChange={(v) => onChange(v || '')}
+      />
+      <Text type="secondary" style={{ fontSize: 12 }}>
+        {slot.hint} · 生效：{effectiveModel || '未配置'} · {source}
+      </Text>
+      {value ? (
+        <Button size="small" type="link" onClick={() => onChange('')}>
+          恢复默认
+        </Button>
+      ) : null}
+    </Space>
+  );
 }
 
 export function Step1Page(): JSX.Element {
@@ -54,7 +114,6 @@ export function Step1Page(): JSX.Element {
   const [preparing, setPreparing] = useState(false);
   const [genLoading, setGenLoading] = useState(false);
   const [abortRef] = useState<{ current: AbortController | null }>({ current: null });
-  const options = useMemo(() => modelOptions(modelConfig), [modelConfig]);
 
   // 若布局未加载成功，本页再兜底拉取一次
   useEffect(() => {
@@ -455,42 +514,18 @@ export function Step1Page(): JSX.Element {
           <Alert
             type="info"
             showIcon
-            message="解说专用模型（可在设置中先配置平台与模型）"
+            message="解说专用模型（默认跟随设置 → 分析模型；可在此按步骤覆盖）"
             description={
               <Space direction="vertical" style={{ width: '100%' }}>
-                {(
-                  [
-                    ['step1SrtModel', 'SRT 模型'],
-                    ['step1StructuredReportModel', '结构化报告'],
-                    ['step1PlotBreakdownModel', '剧情拆解'],
-                    ['step1MainScriptModel', '解说脚本'],
-                    ['step1GoldenHookModel', '抓眼钩子'],
-                    ['step7AdModel', '第七步广告'],
-                  ] as const
-                ).map(([key, label]) => (
-                  <Space key={key} style={{ width: '100%' }}>
-                    <Text style={{ width: 100 }}>{label}</Text>
-                    <Select
-                      allowClear
-                      showSearch
-                      style={{ minWidth: 280 }}
-                      placeholder={
-                        !modelConfigLoaded
-                          ? '加载中…'
-                          : options.length
-                            ? '选择模型'
-                            : '暂无模型，请先在设置中配置平台'
-                      }
-                      notFoundContent={
-                        modelConfigLoaded && !options.length
-                          ? '暂无模型，请先在设置 → 模型配置'
-                          : undefined
-                      }
-                      options={options}
-                      value={c.llmModels[key] || undefined}
-                      onChange={(v) => dispatch(setLlmModel({ key, value: v || '' }))}
-                    />
-                  </Space>
+                {COMMENTARY_MODEL_SLOTS.map((slot) => (
+                  <ModelSlotSelect
+                    key={slot.key}
+                    slot={slot}
+                    value={c.llmModels[slot.key] || ''}
+                    modelConfig={modelConfig}
+                    modelConfigLoaded={modelConfigLoaded}
+                    onChange={(v) => dispatch(setLlmModel({ key: slot.key, value: v }))}
+                  />
                 ))}
               </Space>
             }

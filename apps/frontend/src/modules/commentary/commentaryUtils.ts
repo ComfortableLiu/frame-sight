@@ -32,6 +32,7 @@ import {
 } from './step1Prompts.js';
 import { resolveModelChatEndpoint } from '../../utils/modelChatEndpoint.js';
 import type { ModelConfig } from '../../types/modelConfig.js';
+import { resolveEffectiveCommentaryModel, type CommentaryModelSlot } from './modelSlots.js';
 import {
   setStructuredReport,
   setStep1Srt,
@@ -281,6 +282,16 @@ function resolveEndpoint(modelRef: string, config: ModelConfig | undefined) {
   return ep;
 }
 
+function resolveSlotEndpoint(
+  slot: CommentaryModelSlot,
+  state: { llmModels: import('../../store/commentarySlice.js').CommentaryLlmModels },
+  analysisModels: ModelConfig['analysisModels'],
+  config: ModelConfig | undefined,
+) {
+  const ref = resolveEffectiveCommentaryModel(slot, state.llmModels, analysisModels);
+  return resolveEndpoint(ref, config);
+}
+
 /** JSON 数组转 SRT 文本 */
 export function jsonTranscriptToSrt(jsonText: string): string {
   const raw = extractJsonFromLlmText(jsonText);
@@ -352,7 +363,7 @@ export async function generateCommentaryScript(deps: GenerateScriptDeps): Promis
         throw new Error(audioUp.error || '音频上传失败，无法生成 SRT');
       }
       {
-        const srtEp = resolveEndpoint(state.llmModels.step1SrtModel || state.llmModels.step1StructuredReportModel, modelConfig);
+        const srtEp = resolveSlotEndpoint('step1SrtModel', state, modelConfig?.analysisModels, modelConfig);
         const srtRaw = await streamChatCompletion({
           apiBase: srtEp.apiBase,
           apiKey: srtEp.apiKey,
@@ -375,8 +386,10 @@ export async function generateCommentaryScript(deps: GenerateScriptDeps): Promis
       st.dispatch(setStep1Srt(srtText));
 
       st.dispatch(setScriptGenerating({ running: true, progress: '生成结构化报告…' }));
-      const reportEp = resolveEndpoint(
-        state.llmModels.step1StructuredReportModel || state.llmModels.step1SrtModel,
+      const reportEp = resolveSlotEndpoint(
+        'step1StructuredReportModel',
+        state,
+        modelConfig?.analysisModels,
         modelConfig,
       );
       const reportPrompt = buildStructuredReportPromptText(state.localVideoDurationSeconds);
@@ -478,8 +491,8 @@ export async function generateCommentaryScript(deps: GenerateScriptDeps): Promis
 
     // 2) 剧情拆解 + 抓眼钩子 并行
     st.dispatch(setScriptGenerating({ running: true, progress: '剧情拆解 / 抓眼钩子…' }));
-    const plotEp = resolveEndpoint(state.llmModels.step1PlotBreakdownModel || state.llmModels.step1MainScriptModel, modelConfig);
-    const hookEp = resolveEndpoint(state.llmModels.step1GoldenHookModel || state.llmModels.step1MainScriptModel, modelConfig);
+    const plotEp = resolveSlotEndpoint('step1PlotBreakdownModel', state, modelConfig?.analysisModels, modelConfig);
+    const hookEp = resolveSlotEndpoint('step1GoldenHookModel', state, modelConfig?.analysisModels, modelConfig);
 
     const plotPromise = callChatCompletionNonStream({
       apiBase: plotEp.apiBase,
@@ -548,7 +561,7 @@ export async function generateCommentaryScript(deps: GenerateScriptDeps): Promis
           progress: `分段生成脚本（${plot.segments.length} 段）…`,
         }),
       );
-      const scriptEp = resolveEndpoint(state.llmModels.step1MainScriptModel, modelConfig);
+      const scriptEp = resolveSlotEndpoint('step1MainScriptModel', state, modelConfig?.analysisModels, modelConfig);
       const n = plot.segments.length;
       const results: ScriptPart[] = new Array(n);
       await mapLimit(plot.segments, SEGMENT_PARALLEL_LIMIT, async (segment, idx) => {
@@ -590,7 +603,7 @@ export async function generateCommentaryScript(deps: GenerateScriptDeps): Promis
       parts = results.filter(Boolean);
     } else {
       st.dispatch(setScriptGenerating({ running: true, progress: '单次生成脚本…' }));
-      const scriptEp = resolveEndpoint(state.llmModels.step1MainScriptModel, modelConfig);
+      const scriptEp = resolveSlotEndpoint('step1MainScriptModel', state, modelConfig?.analysisModels, modelConfig);
       const prompt = buildScriptPromptText({
         totalVideoDurationSeconds: state.localVideoDurationSeconds,
         commentaryToOriginalRatio: {
