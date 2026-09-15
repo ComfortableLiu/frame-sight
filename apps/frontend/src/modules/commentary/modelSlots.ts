@@ -77,31 +77,27 @@ export interface ModelOption {
   missingCapability?: boolean;
 }
 
-/** 按输入能力筛选；未标注能力的模型仍展示（并标记 missing）。 */
+/** 只列出设置中勾选启用的模型，并按输入能力筛选。 */
 export function buildCapabilityFilteredOptions(
   config: ModelConfig | undefined,
   inputCapability: ModelInputCapability,
 ): ModelOption[] {
   const out: ModelOption[] = [];
   for (const p of config?.platforms || []) {
-    const models = p.selectedModels?.length ? p.selectedModels : p.models || [];
+    // 与设置 → 分析模型一致：仅 selectedModels
+    const models = p.selectedModels || [];
     for (const m of models) {
       const caps = p.modelSettings?.[m]?.capabilities;
-      const known = Boolean(caps);
-      const ok = !known || Boolean(caps?.[inputCapability]);
-      if (!ok) continue;
-      const capTag = !known
-        ? '未标注能力'
-        : inputCapability === 'audio'
-          ? '音频'
-          : inputCapability === 'video'
-            ? '视频'
-            : '文本';
+      // 未标注能力时：默认仅文本；音频/视频步骤不展示
+      const effectiveCaps = caps ?? { audio: false, video: false, image: false, text: true };
+      if (!effectiveCaps[inputCapability]) continue;
+      const capTag =
+        inputCapability === 'audio' ? '音频' : inputCapability === 'video' ? '视频' : '文本';
       out.push({
         label: `${p.name} · ${m}（${capTag}）`,
         value: `${p.name}::${m}`,
-        capability: caps,
-        missingCapability: !known,
+        capability: effectiveCaps,
+        missingCapability: !caps,
       });
     }
   }

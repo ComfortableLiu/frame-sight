@@ -59,7 +59,7 @@ export function CommentaryLayout(): JSX.Element {
   const maxAllowed = useSelector(selectMaxAllowedStep);
   const flowMode = useSelector(selectFlowMode);
   const modelConfigLoaded = useSelector(selectModelConfigLoaded);
-  const { replace, route } = useRouter();
+  const { replace, push, route } = useRouter();
 
   // 进入解说模式时加载模型配置（设置页/Agent 页可能尚未加载）
   useEffect(() => {
@@ -147,6 +147,9 @@ export function CommentaryLayout(): JSX.Element {
           </Button>
         </Space>
         <Space>
+          <Button size="small" onClick={() => push('settings')}>
+            设置
+          </Button>
           <ThemeSwitcherMini />
           <Typography.Text type="secondary">模式：{flowMode === 'normal' ? '解说' : 'Agent'}</Typography.Text>
         </Space>

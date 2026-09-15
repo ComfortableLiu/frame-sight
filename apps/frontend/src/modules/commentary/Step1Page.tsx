@@ -87,7 +87,7 @@ function ModelSlotSelect({
         }
         notFoundContent={
           modelConfigLoaded && !options.length
-            ? '无匹配能力的模型，请到设置 → 模型配置标注能力'
+            ? '无可用模型：请在设置 → 模型配置勾选模型，并在分析模型中标注能力'
             : undefined
         }
         options={options}
